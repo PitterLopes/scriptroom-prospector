@@ -124,8 +124,10 @@ falls back to the browser.
 
 ## Known limits
 
-- Discovery uses Instagram's web search page and profile headers; the DOM is unstable and may need selector
-  updates. Profile "recent posts summary" and "last post date" are not extracted yet (scoring works without them).
+- Discovery reads Instagram's keyword search grid (posts about the term) and takes each post's author as a
+  candidate; profile reading uses the og: tags, the grid's alt texts and up to three post pages. The DOM is
+  unstable and the selectors live in one file. Broad terms surface big accounts; niche hashtags surface the
+  small creators the ICP wants.
 - Follow-ups are API-only and therefore only possible inside Meta's 24-hour window; otherwise the operator is asked
   to follow up manually (the `HUMAN_AGENT` tag requires Meta approval).
 - The affiliates funnel has its states and tables but no scheduler, prompts or UI yet (`affiliates.enabled` is false).

@@ -87,19 +87,27 @@ export class RealInstagramBrowser implements InstagramBrowser {
     return this.withPage(jobId, async (page) => {
       const term = query.replace(/^#/, "");
       await this.goto(page, `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(term)}`);
-      await page.waitForTimeout(2500);
+      await page.waitForTimeout(4000);
       await this.assertNotRestricted(page);
-      const hrefs = await page.locator('a[href^="/"]').evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).getAttribute("href") ?? ""));
+      // The search page is a grid of posts about the term. The people who published them are the candidates:
+      // by construction they already make content on the subject.
+      const hrefs = await page.locator('a[href*="/p/"], a[href*="/reel/"]').evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).getAttribute("href") ?? ""));
+      const codes: Array<{ url: string; kind: "post" | "reel" }> = [];
+      const seenCodes = new Set<string>();
+      for (const href of hrefs) {
+        const match = /\/(p|reel)\/([A-Za-z0-9_-]+)\/?/.exec(href);
+        if (!match || seenCodes.has(match[2]!)) continue;
+        seenCodes.add(match[2]!);
+        codes.push({ url: `https://www.instagram.com/${match[1]}/${match[2]}/`, kind: match[1] === "reel" ? "reel" : "post" });
+      }
+      const me = await this.loggedInUsername(page);
       const seen = new Set<string>();
       const out: ProfileCandidate[] = [];
-      for (const href of hrefs) {
-        const match = /^\/([a-z0-9._]{1,30})\/?$/i.exec(href);
-        if (!match) continue;
-        const username = match[1]!.toLowerCase();
-        if (["explore", "reels", "direct", "accounts", "p", "stories", "about", "legal"].includes(username)) continue;
-        if (seen.has(username)) continue;
-        seen.add(username);
-        out.push({ username, sourceDetail: query });
+      for (const code of codes.slice(0, Math.max(limit * 2, 12))) {
+        const author = await this.readPostAuthor(page, code.url);
+        if (!author || seen.has(author) || author === me) continue;
+        seen.add(author);
+        out.push({ username: author, sourceDetail: query });
         if (out.length >= limit) break;
       }
       return out;
@@ -154,25 +162,60 @@ export class RealInstagramBrowser implements InstagramBrowser {
     });
   }
 
+  /** The author of a post, from `og:description` (`… - username no Date`) or the first profile link in the post body. */
+  private async readPostAuthor(page: Page, url: string): Promise<string | null> {
+    try {
+      await this.goto(page, url);
+      await page.waitForTimeout(1500 + Math.floor(Math.random() * 1500));
+      await this.assertNotRestricted(page);
+      const description = (await page.locator('meta[property="og:description"]').getAttribute("content").catch(() => null)) ?? "";
+      const fromOg = parseOgAuthorAndDate(description).username;
+      if (fromOg) return fromOg;
+      const links = await page.locator('a[href^="/"][role="link"]').evaluateAll((anchors) => anchors.map((a) => ({ href: (a as HTMLAnchorElement).getAttribute("href") ?? "", text: (a.textContent ?? "").trim().toLowerCase() })));
+      const nav = new Set(["", "reels", "direct", "explore", "accounts", "p", "stories", "legal", "popular"]);
+      for (const link of links) {
+        const match = /^\/([a-z0-9._]{1,30})\/$/i.exec(link.href);
+        if (!match) continue;
+        const handle = match[1]!.toLowerCase();
+        if (nav.has(handle) || link.text !== handle) continue;
+        return handle;
+      }
+      return null;
+    } catch (error: unknown) {
+      if (error instanceof InstagramRestrictionError) throw error;
+      return null;
+    }
+  }
+
+  /** The operator's own handle, read from the "Perfil" link in the navigation; never a candidate. */
+  private async loggedInUsername(page: Page): Promise<string | null> {
+    const links = await page.locator('a[href^="/"][role="link"]').evaluateAll((anchors) => anchors.map((a) => ({ href: (a as HTMLAnchorElement).getAttribute("href") ?? "", text: (a.textContent ?? "").trim().toLowerCase() }))).catch(() => []);
+    const profile = links.find((l) => /^(perfil|profile)$/.test(l.text) && /^\/[a-z0-9._]{1,30}\/$/i.test(l.href));
+    return profile ? profile.href.replace(/\//g, "").toLowerCase() : null;
+  }
+
   /** Post and reel permalinks in grid order (newest first), from the profile page. */
-  private async collectPostLinks(page: Page, handle: string): Promise<Array<{ url: string; kind: "post" | "reel" }>> {
-    const hrefs = await page.locator('main a[href*="/p/"], main a[href*="/reel/"]').evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).getAttribute("href") ?? ""));
+  private async collectPostLinks(page: Page, handle: string): Promise<Array<{ url: string; kind: "post" | "reel"; alt: string | null }>> {
+    const items = await page
+      .locator('main a[href*="/p/"], main a[href*="/reel/"]')
+      .evaluateAll((anchors) => anchors.map((a) => ({ href: (a as HTMLAnchorElement).getAttribute("href") ?? "", alt: a.querySelector("img")?.getAttribute("alt") ?? null })));
     const seen = new Set<string>();
-    const out: Array<{ url: string; kind: "post" | "reel" }> = [];
-    for (const href of hrefs) {
-      const match = /\/(p|reel)\/([A-Za-z0-9_-]+)\/?/.exec(href);
+    const out: Array<{ url: string; kind: "post" | "reel"; alt: string | null }> = [];
+    for (const item of items) {
+      const match = /^(?:\/([a-z0-9._]{1,30}))?\/(p|reel)\/([A-Za-z0-9_-]+)\/?/i.exec(item.href);
       if (!match) continue;
-      const url = `https://www.instagram.com/${match[1]}/${match[2]}/`;
+      if (match[1] && match[1].toLowerCase() !== handle) continue; // collab or tagged post from another account
+      const url = `https://www.instagram.com/${match[2]}/${match[3]}/`;
       if (seen.has(url)) continue;
       seen.add(url);
-      out.push({ url, kind: match[1] === "reel" ? "reel" : "post" });
+      out.push({ url, kind: match[2] === "reel" ? "reel" : "post", alt: usableAlt(item.alt) });
     }
     log.debug("post links collected", { handle, count: out.length });
     return out;
   }
 
   /** Opens one permalink and reads the caption and the date; a few seconds per post, like a person skimming. */
-  private async readPost(page: Page, link: { url: string; kind: "post" | "reel" }): Promise<RecentPost | null> {
+  private async readPost(page: Page, link: { url: string; kind: "post" | "reel"; alt?: string | null }): Promise<RecentPost | null> {
     try {
       await this.goto(page, link.url);
       await page.waitForTimeout(1500 + Math.floor(Math.random() * 1500));
@@ -180,9 +223,15 @@ export class RealInstagramBrowser implements InstagramBrowser {
       const description = (await page.locator('meta[property="og:description"]').getAttribute("content").catch(() => null)) ?? "";
       const title = (await page.locator('meta[property="og:title"]').getAttribute("content").catch(() => null)) ?? "";
       const datetime = await page.locator("time[datetime]").first().getAttribute("datetime").catch(() => null);
-      const caption = extractCaption(description, title);
+      const og = parseOgAuthorAndDate(description);
+      let caption = extractCaption(description, title) ?? link.alt ?? null;
+      if (!caption) {
+        const bodyText = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
+        caption = pickCaptionFromText(bodyText, og.username);
+      }
       if (!caption) return null;
-      return { url: link.url, caption: caption.slice(0, 400), postedAt: datetime ? new Date(datetime).toISOString() : null, kind: link.kind };
+      const postedAt = datetime ? new Date(datetime).toISOString() : og.postedAt;
+      return { url: link.url, caption: caption.slice(0, 400), postedAt, kind: link.kind };
     } catch (error: unknown) {
       if (error instanceof InstagramRestrictionError) throw error;
       return null;
@@ -281,9 +330,12 @@ export class RealInstagramBrowser implements InstagramBrowser {
     page.on("requestfailed", (req) => artifacts.failedRequests.push(`${req.method()} ${req.url().slice(0, 200)}`));
     page.on("framenavigated", (frame) => {
       if (frame !== page.mainFrame()) return;
-      const host = new URL(frame.url()).hostname;
-      if (frame.url() !== "about:blank" && !INSTAGRAM_HOST.test(host)) {
-        log.warn("tab left instagram.com; closing it", { url: frame.url() });
+      const url = frame.url();
+      // Blank, error and Chrome-internal pages are not "leaving Instagram"; only a real foreign host is.
+      if (!/^https?:/i.test(url)) return;
+      const host = new URL(url).hostname;
+      if (!INSTAGRAM_HOST.test(host)) {
+        log.warn("tab left instagram.com; closing it", { url });
         void page.close().catch(() => undefined);
       }
     });
@@ -336,16 +388,47 @@ export function parseCompactNumber(raw: string): number | null {
 }
 
 /**
- * Instagram's og:description for a post looks like
- * `12 likes, 3 comments - user on October 1, 2026: "the caption..."`; og:title carries the same text on reels.
+ * What Instagram renders (seen on 2026-10-12, logged in, pt-BR):
+ * - post og:title: `Name no Instagram: "caption…"` (en: `on Instagram`);
+ * - post/reel og:description: `129 likes, 0 comments - username no June 15, 2026` (en: `on`), sometimes followed by `: "caption"`;
+ * - reel og:title is only the name: the caption comes from the page text instead.
  */
 export function extractCaption(description: string, title: string): string | null {
-  for (const text of [description, title]) {
-    const quoted = /:\s*[""“](.+?)[""”]\s*$/s.exec(text) ?? /:\s*[""“](.+)$/s.exec(text);
+  for (const text of [title, description]) {
+    const quoted = /(?:no|on) Instagram:\s*[""“](.+?)[""”]?\s*$/s.exec(text) ?? /:\s*[""“](.+?)[""”]?\s*$/s.exec(text);
     if (quoted?.[1]?.trim()) return quoted[1].trim();
   }
-  const fallback = description.replace(/^[^:]*:\s*/, "").trim();
-  return fallback.length >= 8 ? fallback : null;
+  return null;
+}
+
+/** The author and the date from `… - username no June 15, 2026` (or `on`). */
+export function parseOgAuthorAndDate(description: string): { username: string | null; postedAt: string | null } {
+  const match = /-\s*([a-z0-9._]{1,30})\s+(?:no|on)\s+([A-Z][a-z]+ \d{1,2}, \d{4})/.exec(description);
+  if (!match) return { username: null, postedAt: null };
+  const date = new Date(`${match[2]} 12:00:00 UTC`);
+  return { username: match[1]!.toLowerCase(), postedAt: Number.isNaN(date.getTime()) ? null : date.toISOString() };
+}
+
+/** Caption from the reel page text: the first long line that is not navigation and starts with the username line's successor. */
+export function pickCaptionFromText(bodyText: string, username: string | null): string | null {
+  const lines = bodyText.split("\n").map((l) => l.trim()).filter((l) => l.length >= 25);
+  const noise = /^(página inicial|reels|mensagens|pesquisa|notificações|novo post|painel profissional|configurações|também da meta|mais|ver tradução|curtir|comentar|compartilhar|salvar|áudio original)/i;
+  for (const line of lines) {
+    if (noise.test(line)) continue;
+    if (username && line.toLowerCase() === username) continue;
+    if (/^\d[\d.,]*\s*(curtidas|likes|comentários|comments)/i.test(line)) continue;
+    return line.slice(0, 400);
+  }
+  return null;
+}
+
+/** Grid images carry the caption as alt text; generic alts ("Clipe", "Foto do perfil…") are not captions. */
+export function usableAlt(alt: string | null): string | null {
+  if (!alt) return null;
+  const text = alt.trim();
+  if (text.length < 15) return null;
+  if (/^(foto do perfil|profile photo|clipe|reel|photo by|foto de|no photo description|nenhuma descrição)/i.test(text)) return null;
+  return text.slice(0, 400);
 }
 
 export function parseOgName(title: string): string | null {

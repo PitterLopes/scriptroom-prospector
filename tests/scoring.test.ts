@@ -31,11 +31,13 @@ describe("scoreProfile", () => {
     expect(score.qualified).toBe(false);
     expect(score.roleGuess).toBe("employee");
   });
-  it("penalises accounts out of the follower range and stale accounts", () => {
-    const stale = scoreProfile({ username: "x", bio: "Dentista CRO 1", followers: 500_000, lastPublicPostAt: new Date(Date.now() - 120 * 86_400_000).toISOString() }, TEST_CONFIG);
-    expect(stale.reasons).toContain("followers out of range (500000)");
+  it("penalises stale accounts and never qualifies accounts above the follower ceiling", () => {
+    const stale = scoreProfile({ username: "x", bio: "Dentista CRO 1", followers: 500, lastPublicPostAt: new Date(Date.now() - 120 * 86_400_000).toISOString() }, TEST_CONFIG);
     expect(stale.reasons).toContain("no public post in 60 days");
     expect(stale.qualified).toBe(false);
+    const big = scoreProfile({ ...SAMPLE_PROFILES![0]!, followers: 159_000 }, TEST_CONFIG);
+    expect(big.qualified).toBe(false);
+    expect(big.reasons.some((r) => r.startsWith("too many followers"))).toBe(true);
   });
   it("guesses roles from bio patterns", () => {
     expect(guessRole("Fundadora da clínica", "")).toBe("decision_maker");

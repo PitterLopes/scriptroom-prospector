@@ -115,14 +115,20 @@ export function scoreProfile(profile: ProfileSignals, config: BusinessConfig): I
   }
 
   const followers = profile.followers ?? null;
+  let tooBig = false;
   if (followers !== null) {
     const { min, max } = config.icp.followerRange;
     if (followers >= min && followers <= max) {
       score += 10;
       reasons.push(`followers in range (${followers})`);
+    } else if (followers > max) {
+      // Above the range the person has a team or an agency; the app competes with people, not with a blank page.
+      tooBig = true;
+      score -= 40;
+      reasons.push(`too many followers for the target (${followers} > ${max})`);
     } else {
       score -= 20;
-      reasons.push(`followers out of range (${followers})`);
+      reasons.push(`followers below range (${followers})`);
     }
   }
 
@@ -138,14 +144,11 @@ export function scoreProfile(profile: ProfileSignals, config: BusinessConfig): I
     score += 5;
     reasons.push("publishes regularly");
   }
-  if (profile.lastPublicPostAt) {
+  if (posts.length === 0 && profile.lastPublicPostAt) {
     const days = (Date.now() - new Date(profile.lastPublicPostAt).getTime()) / 86_400_000;
     if (days > 60) {
       score -= 25;
       reasons.push("no public post in 60 days");
-    } else if (days <= 14) {
-      score += 5;
-      reasons.push("posted in the last 2 weeks");
     }
   }
   if (profile.location && BRAZIL_PATTERNS.test(profile.location)) {
@@ -177,7 +180,7 @@ export function scoreProfile(profile: ProfileSignals, config: BusinessConfig): I
     roleGuess,
     priority,
     // A person who publishes, who is not an employee or a student, and whose profile gave us a real post to talk about.
-    qualified: bounded >= 50 && roleGuess !== "employee" && posts.length > 0,
+    qualified: bounded >= 50 && roleGuess !== "employee" && posts.length > 0 && !tooBig,
   };
 }
 
