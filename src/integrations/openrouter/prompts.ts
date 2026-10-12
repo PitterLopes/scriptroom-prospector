@@ -138,6 +138,7 @@ export function openingPrompt(lead: Lead, variant: OpeningVariantConfig, config:
     "- Pode dizer o nome do produto. Não manda link, não fala de preço, não promete resultado, não fala em 'grátis' (o que é grátis fica para a conversa, não para a abertura).",
     "- Deixe explícito que um 'não' ou um 'não faz sentido para mim' também ajuda: é o que torna a resposta fácil.",
     "- Entre 2 e 5 frases curtas, no máximo 480 caracteres. Termina com uma pergunta de sim ou não.",
+    "- Escreva como quem digita no celular para alguém que acabou de conhecer: frases do jeito que se fala, pode usar o primeiro nome da pessoa, nada de palavra de anúncio ('solução', 'otimizar', 'alavancar', 'profissionalizar'), nada de formatação, nada que pareça texto pronto. Se lida em voz alta, tem de soar como uma pessoa, não como uma empresa.",
     `Estilo pedido: ${STYLE_GUIDE[variant.style]}`,
   ].join("\n");
   const user = `PERFIL:\n${profileBlock(lead)}\n\nEscreva a mensagem.`;
