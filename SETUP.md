@@ -75,11 +75,16 @@ e você responde à mão. Com ela, a IA responde sozinha dentro das regras.
 1. **Feito em 12/10/2026:** no app **Scriptroom** do Meta for Developers entrou o caso de uso "Gerenciar mensagens
    e conteúdo no Instagram" (API com login do Instagram, app do Instagram `Scriptroom-IG`), com as permissões
    `instagram_business_basic`, `instagram_business_manage_comments` e `instagram_business_manage_messages`.
-2. **Falta você:** em Casos de uso › Personalizar › "2. Gerar tokens de acesso" › **Adicionar conta**, entre com a
-   `@lopespitter` na janela que abre e autorize. Aí aparece o botão de gerar o token.
-3. Copie o token gerado para `INSTAGRAM_PAGE_ACCESS_TOKEN` no `.env` e o ID da conta para
-   `INSTAGRAM_BUSINESS_ACCOUNT_ID`. O `INSTAGRAM_APP_SECRET` (segredo do app do Instagram) já está no `.env`.
-4. O `INSTAGRAM_WEBHOOK_VERIFY_TOKEN` já está no `.env` e cadastrado na Meta.
+2. **Feito em 12/10/2026:** a `@lopespitter` foi adicionada como "Testadora do Instagram" do app, o convite foi
+   aceito no Instagram, o token de acesso foi gerado (a janela de gerar token é um pop-up: o Chrome precisa permitir
+   pop-ups de developers.facebook.com) e a conta foi inscrita no campo `messages` do webhook.
+3. **No `.env` já estão** `INSTAGRAM_PAGE_ACCESS_TOKEN` (token do Instagram, prefixo `IGAA`, de longa duração: a Meta
+   avisa quando ele vence; gere outro no mesmo lugar e troque no `.env`), `INSTAGRAM_BUSINESS_ACCOUNT_ID`
+   (17841401199182901), `INSTAGRAM_APP_SECRET` e `INSTAGRAM_WEBHOOK_VERIFY_TOKEN`. O id que `/me` devolve para
+   esse token é outro (28721963587423697): é o id do usuário na API com login do Instagram. Nenhum dos dois é segredo.
+4. Enquanto o app não passa pela **análise da Meta** (etapa 5 na página do caso de uso), só contas com função no app
+   (você) conseguem conversar pela API. Para o piloto com leads de verdade, peça a análise de
+   `instagram_business_manage_messages` quando o fluxo estiver provado.
 5. **O webhook já está configurado** (feito em 12/10/2026): a Meta entrega as mensagens numa caixa de entrada
    na sua Cloudflare, o Worker `scriptroom-prospector-inbox` (pasta `relay/`), em
    `https://scriptroom-prospector-inbox.pitterdebarros.workers.dev/webhook`, assinado com o segredo do app do
