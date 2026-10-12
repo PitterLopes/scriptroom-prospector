@@ -118,11 +118,11 @@ function profileBlock(lead: Lead): string {
 
 const STYLE_GUIDE: Record<OpeningVariantConfig["style"], string> = {
   honest_ask:
-    "Três partes, nesta ordem: (1) um elogio específico e verdadeiro a um detalhe do perfil; (2) quem escreve e por quê, com as palavras da história do fundador: está desenvolvendo o app sozinho, sem investimento de fora, para quem grava vídeo; (3) o pedido: testar o app e dizer o que achou ajudaria a continuar — e deixar claro que responder só 'não faz sentido para mim' já ajuda. Termina perguntando se pode mandar o app para a pessoa testar.",
+    "Três partes, nesta ordem: (1) um elogio específico e verdadeiro a um detalhe do perfil; (2) quem escreve e por quê, com as palavras da história de quem escreve (QUEM ESCREVE E POR QUÊ), sem acrescentar nada a ela; (3) o pedido: testar e dizer o que achou ajudaria — e deixar claro que responder só 'não faz sentido para mim' já ajuda. Termina perguntando se pode mandar o produto para a pessoa testar.",
   honest_short:
-    "Mais curta: um elogio específico a um detalhe do perfil, uma frase dizendo que quem escreve está desenvolvendo um app para quem grava vídeo e procura gente para testar e dar feedback, e a pergunta se pode mandar para a pessoa experimentar. Uma frase final dizendo que um 'não' também ajuda.",
+    "Mais curta: um elogio específico a um detalhe do perfil, uma frase com o essencial de QUEM ESCREVE E POR QUÊ (quem é, o que faz e que procura gente para testar e dar feedback), e a pergunta se pode mandar para a pessoa experimentar. Uma frase final dizendo que um 'não' também ajuda.",
   honest_peer:
-    "De colega para colega: quem escreve também grava vídeo para o próprio negócio e fez o app primeiro para si; um elogio específico ao perfil; e o pedido de ajuda: testar e contar o que não funcionou. Dizer que um 'não faz sentido' também ajuda, porque evita insistir com quem não precisa.",
+    "De colega para colega: quem escreve vive o mesmo problema que a pessoa, do jeito que QUEM ESCREVE E POR QUÊ conta (sem inventar nada além disso); um elogio específico ao perfil; e o pedido de ajuda: testar e contar o que não funcionou. Dizer que um 'não faz sentido' também ajuda, porque evita insistir com quem não precisa.",
 };
 
 export function openingPrompt(lead: Lead, variant: OpeningVariantConfig, config: BusinessConfig): { system: string; user: string } {
@@ -135,7 +135,7 @@ export function openingPrompt(lead: Lead, variant: OpeningVariantConfig, config:
     "- Soa como uma pessoa pedindo ajuda a outra, não como campanha. Nada de 'Olá, tudo bem?' genérico, nada de lista, nada de emoji em série.",
     "- A mensagem COMEÇA elogiando UM post real da lista POSTS RECENTES: diga o que aquele post específico tem de bom (a explicação, o exemplo, o jeito de falar), de forma que a pessoa reconheça que você viu o post. Elogio genérico ('adorei seu perfil', 'conteúdo top') está errado. Nunca invente um post nem atribua ao post algo que a legenda não mostra.",
     "- Nunca finja ser cliente ou paciente. Nunca use informação falsa para arrancar resposta.",
-    "- Pode dizer o nome do app. Não manda link, não fala de preço, não promete resultado, não diz que é 'grátis' (só o primeiro roteiro é grátis, e isso fica para depois).",
+    "- Pode dizer o nome do produto. Não manda link, não fala de preço, não promete resultado, não fala em 'grátis' (o que é grátis fica para a conversa, não para a abertura).",
     "- Deixe explícito que um 'não' ou um 'não faz sentido para mim' também ajuda: é o que torna a resposta fácil.",
     "- Entre 2 e 5 frases curtas, no máximo 480 caracteres. Termina com uma pergunta de sim ou não.",
     `Estilo pedido: ${STYLE_GUIDE[variant.style]}`,
@@ -190,10 +190,10 @@ export function decidePrompt(
     "COMO CONDUZIR:",
     "- Primeiro entenda a necessidade da pessoa; só apresente o produto quando ela perguntar ou mostrar interesse (intenção interested, asked_info ou asked_pricing).",
     `- Ao apresentar, diga em uma frase quem é ${config.owner.name} e o que o ${config.company.name} faz. Uma vez só.`,
-    `- Só use a ação send_store_link quando a pessoa quiser experimentar; aí a resposta inclui o link ${storeLink} e lembra que o primeiro roteiro é grátis.`,
+    `- Só use a ação send_store_link quando a pessoa quiser experimentar; aí a resposta inclui o link ${storeLink} e lembra que ${config.offer.trialNote}.`,
     whatsapp ? `- Se a pessoa quiser falar com alguém, use send_whatsapp_link com ${whatsapp}.` : "- Não existe WhatsApp: se a pessoa pedir para falar com alguém, use escalate_to_human.",
     "- Objeção: reconheça, responda com uma afirmação permitida que toque no ponto, e devolva uma pergunta. Não insista mais de uma vez.",
-    "- Objeção 'já tenho agência / freelancer / alguém que faz': não dispute. Use o POSICIONAMENTO: o app é alavanca para quem produz, e a pessoa pode repassar a quem cuida dos vídeos dela; se ela mesma aparece no vídeo, o roteiro e o teleprompter continuam sendo para ela.",
+    "- Objeção 'já tenho quem faça / já uso outra coisa': não dispute. Responda com o POSICIONAMENTO, que diz como o produto convive com o que a pessoa já tem.",
     "- not_the_owner ou will_forward: agradeça e pergunte, de forma leve, qual é a melhor forma de chegar a quem decide; nunca pressione.",
     "- not_interested: agradeça em uma frase e encerre (close). opt_out: encerre sem resposta nenhuma (close, reply vazio). close é SÓ para esses dois casos.",
     "- Quando a pessoa diz que vai testar, agradece ou fecha a conversa sem pergunta pendente: schedule_follow_up (follow_up_hours 20), SEMPRE com uma resposta de uma linha agradecendo e deixando a porta aberta para o feedback (nunca reply vazio: mensagem sem resposta parece descaso). Nunca close: quem vai testar continua em aberto.",

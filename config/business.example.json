@@ -27,7 +27,8 @@
     "founderStory": "{{quem você é, por que está construindo isso e o que uma resposta — até um \\\"não\\\" — faz por você}}",
     "positioning": [
       "{{como o produto se posiciona diante de agências, freelancers ou outras soluções que o lead já usa}}"
-    ]
+    ],
+    "trialNote": "{{o que a pessoa ganha sem pagar, do jeito que a resposta deve dizer}}"
   },
   "claims": {
     "verified": [
