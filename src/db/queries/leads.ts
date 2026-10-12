@@ -312,6 +312,15 @@ export function nextLeadsToContact(db: Db, funnel: Funnel, limit: number): Lead[
     .all();
 }
 
+export function countQualifiedWaiting(db: Db, funnel: Funnel): number {
+  const row = db
+    .select({ count: sql<number>`count(*)` })
+    .from(leads)
+    .where(and(eq(leads.funnel, funnel), eq(leads.pipelineState, "qualified"), eq(leads.channelState, "browser_contact_pending")))
+    .get();
+  return row?.count ?? 0;
+}
+
 export function leadsWithDueFollowUp(db: Db, now: Date = new Date()): Lead[] {
   return db
     .select()

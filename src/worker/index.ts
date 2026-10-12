@@ -25,6 +25,10 @@ export const HANDLERS: Record<JobType, JobHandler> = {
 };
 
 const ALL_TYPES = Object.keys(HANDLERS) as JobType[];
+const BROWSER_TYPES: readonly JobType[] = ["discover_profiles", "enrich_and_score", "send_first_dm"];
+const API_TYPES = ALL_TYPES.filter((t) => !BROWSER_TYPES.includes(t));
+/** When the next browser job may start; replies and API work are never held by it. Survives across passes. */
+let browserFreeAt = 0;
 
 const RELAY_PULL_INTERVAL_MS = 30_000;
 
@@ -45,12 +49,17 @@ export async function runOnce(ctx: WorkerContext, maxJobs = 20): Promise<{ ran: 
       await pullRelaySafely(ctx.db, { url: ctx.env.RELAY_URL, token: ctx.env.RELAY_TOKEN, ownAccountId: ctx.env.INSTAGRAM_BUSINESS_ACCOUNT_ID });
       lastPull = Date.now();
     }
-    const job = claimNext(ctx.db, ctx.workerId, ALL_TYPES, ctx.now());
+    const browserResting = Date.now() < browserFreeAt;
+    const job = claimNext(ctx.db, ctx.workerId, browserResting ? API_TYPES : ALL_TYPES, ctx.now());
     if (!job) break;
     ran += 1;
     const handler = HANDLERS[job.type as JobType];
     try {
       const result = await handler(job, ctx);
+      if (BROWSER_TYPES.includes(job.type as JobType)) {
+        // Rest between page loads the way a person would; the gap is jittered so it never looks like a clock.
+        browserFreeAt = Date.now() + ctx.env.BROWSER_PACING_SECONDS * 1000 * (0.6 + ctx.random() * 0.9);
+      }
       if (result.kind === "done") {
         completeJob(ctx.db, job.id);
         ctx.log.info("job done", { type: job.type, id: job.id, note: result.note });

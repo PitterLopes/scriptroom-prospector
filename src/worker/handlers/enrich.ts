@@ -1,10 +1,10 @@
-import { parsePayload } from "@/db/queries/jobs";
+import { countJobsDoneSince, parsePayload } from "@/db/queries/jobs";
 import { getLead, movePipeline, moveChannel, updateLeadFields } from "@/db/queries/leads";
 import { recordLeadEvent } from "@/db/queries/events";
 import { withBrowserLock } from "@/integrations/browser/lock";
 import { BrowserUnavailableError, InstagramRestrictionError } from "@/integrations/browser/types";
 import { bestSendWindow, scoreProfile } from "@/features/leads/scoring";
-import { addSeconds } from "@/lib/time";
+import { addSeconds, startOfDayInZone } from "@/lib/time";
 import { isBrowserPaused, pauseBrowser, tripOnRestriction } from "../safety";
 import { done, postpone, type JobHandler } from "./types";
 
@@ -15,6 +15,8 @@ export const enrichAndScore: JobHandler = async (job, ctx) => {
   if (!lead) return done("lead no longer exists");
   if (lead.pipelineState !== "discovered") return done("already processed");
   if (isBrowserPaused(ctx.db)) return postpone(addSeconds(ctx.now(), 15 * 60), "browser queue paused");
+  const doneToday = countJobsDoneSince(ctx.db, "enrich_and_score", startOfDayInZone(ctx.now(), ctx.env.OPERATING_TIMEZONE).toISOString());
+  if (doneToday >= ctx.env.ENRICH_PER_DAY) return postpone(addSeconds(ctx.now(), 4 * 3600), `enrich cap for today reached (${doneToday})`);
   try {
     const profile = await withBrowserLock(async () => {
       const browser = ctx.browser();

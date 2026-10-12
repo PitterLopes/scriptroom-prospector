@@ -181,3 +181,8 @@ export function pendingInboundJobsForSender(db: Db, senderId: string): Array<{ m
     .all();
   return rows.map((r) => JSON.parse(r.payload) as { mid: string; timestamp: string });
 }
+
+export function countJobsDoneSince(db: Db, type: JobType, sinceIso: string): number {
+  const row = db.select({ count: sql<number>`count(*)` }).from(jobs).where(and(eq(jobs.type, type), eq(jobs.status, "done"), sql`${jobs.finishedAt} >= ${sinceIso}`)).get();
+  return row?.count ?? 0;
+}

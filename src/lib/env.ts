@@ -21,6 +21,14 @@ const envSchema = z.object({
   FOLLOW_BEFORE_DM: boolFromString.default(true),
   /** People answer in bursts of short messages; wait this long after the last one before replying once to all of them. */
   INBOUND_SETTLE_SECONDS: z.coerce.number().int().min(0).max(600).default(45),
+  /** Minimum gap between two browser jobs (search, profile read, DM). Instagram goes quiet on a session that never rests. */
+  BROWSER_PACING_SECONDS: z.coerce.number().int().min(0).max(3600).default(45),
+  /** Keyword searches per day, rotating through the configured hashtags and keywords. */
+  DISCOVERY_QUERIES_PER_DAY: z.coerce.number().int().min(0).max(50).default(4),
+  /** No new searches while this many qualified leads are still waiting for their first DM. */
+  DISCOVERY_BACKLOG_TARGET: z.coerce.number().int().min(1).max(1000).default(40),
+  /** Profiles read and scored per day: each one is a dozen page loads. */
+  ENRICH_PER_DAY: z.coerce.number().int().min(1).max(1000).default(40),
 
   INSTAGRAM_APP_SECRET: z.string().optional(),
   INSTAGRAM_PAGE_ACCESS_TOKEN: z.string().optional(),

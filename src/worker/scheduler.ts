@@ -1,7 +1,7 @@
 import { enqueue } from "@/db/queries/jobs";
-import { leadsWithDueFollowUp, nextLeadsToContact } from "@/db/queries/leads";
+import { countQualifiedWaiting, leadsWithDueFollowUp, nextLeadsToContact } from "@/db/queries/leads";
 import { getSetting } from "@/db/queries/settings";
-import { isoDateInZone, nextOperatingInstant } from "@/lib/time";
+import { isoDateInZone, nextOperatingInstant, startOfDayInZone } from "@/lib/time";
 import type { WorkerContext } from "./context";
 import { allowanceToday, limitConfig, sentToday } from "./handlers/first-dm";
 import { isBrowserPaused, isSystemPaused } from "./safety";
@@ -31,13 +31,19 @@ export function scheduleTick(ctx: WorkerContext): { scheduled: number } {
 
   if (isBrowserPaused(ctx.db)) return { scheduled };
 
+  // Discover only what can be contacted: a backlog of qualified leads is days of DMs already, and every search is
+  // a dozen page loads Instagram counts against the session. A few queries a day, rotating through the list.
   const discoveryEnabled = getSetting<boolean>(ctx.db, "discovery.enabled", true);
-  if (discoveryEnabled) {
+  const backlog = countQualifiedWaiting(ctx.db, "customers");
+  if (discoveryEnabled && backlog < ctx.env.DISCOVERY_BACKLOG_TARGET && ctx.env.DISCOVERY_QUERIES_PER_DAY > 0) {
     const config = limitConfig(ctx);
     const firstSlot = nextOperatingInstant(now, config.operatingHours, config.timeZone);
-    const queries = [...ctx.config.icp.hashtags.map((h) => `#${h}`), ...ctx.config.icp.keywords.slice(0, 12)];
+    const all = [...ctx.config.icp.hashtags.map((h) => `#${h}`), ...ctx.config.icp.keywords];
+    const perDay = Math.min(ctx.env.DISCOVERY_QUERIES_PER_DAY, all.length);
+    const dayNumber = Math.floor(startOfDayInZone(now, ctx.env.OPERATING_TIMEZONE).getTime() / 86_400_000);
+    const queries = Array.from({ length: perDay }, (_, i) => all[(dayNumber * perDay + i) % all.length]!);
     queries.forEach((query, index) => {
-      const runAt = new Date(firstSlot.getTime() + index * 7 * 60_000);
+      const runAt = new Date(firstSlot.getTime() + index * 20 * 60_000);
       bump(enqueue(ctx.db, "discover_profiles", { funnel: "customers", query, limit: DISCOVERY_PER_QUERY }, { idempotencyKey: `discover:${query}:${day}`, runAt, maxAttempts: 2 }));
     });
   }
