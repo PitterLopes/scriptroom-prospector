@@ -10,6 +10,7 @@ import {
   decidePrompt,
   followUpPrompt,
   openingPrompt,
+  recentPostsOf,
   type OpeningVariantConfig,
   type Stage,
 } from "@/integrations/openrouter/prompts";
@@ -56,24 +57,29 @@ export class ConversationEngine {
   async writeOpening(lead: Lead, variant: OpeningVariantConfig): Promise<{ message: string; detailUsed: string }> {
     const prompt = openingPrompt(lead, variant, this.config);
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = await this.ai.call<{ detail_used: string; message: string }>({
+      const posts = recentPostsOf(lead);
+      const result = await this.ai.call<{ post_index: number; detail_used: string; message: string }>({
         purpose: "opening",
         tier: "main",
         system: attempt === 0 ? prompt.system : `${prompt.system}\n\nA tentativa anterior foi recusada pelo verificador. Reescreva mais simples, sem produto, sem link, sem número.`,
         user: prompt.user,
         schema: OPENING_SCHEMA,
-        maxTokens: 300,
+        maxTokens: 700,
         temperature: 0.8,
         leadId: lead.id,
       });
       const message = result.json.message.trim();
       const guard = checkClaims(message, this.config);
-      const tooLong = message.length > 320;
+      const tooLong = message.length > 520;
       const hasLink = /https?:\/\//i.test(message);
-      if (guard.ok && !tooLong && !hasLink) return { message, detailUsed: result.json.detail_used };
+      const postMissing = posts.length > 0 && !(result.json.post_index >= 1 && result.json.post_index <= posts.length);
+      if (guard.ok && !tooLong && !hasLink && !postMissing) {
+        const post = posts[result.json.post_index - 1];
+        return { message, detailUsed: post ? `post ${result.json.post_index} (${post.url}): ${result.json.detail_used}` : result.json.detail_used };
+      }
       recordLeadEvent(this.db, lead.id, "opening_refused", "ai", {
         attempt,
-        violations: [...(guard.ok ? [] : guard.violations), ...(tooLong ? ["too_long"] : []), ...(hasLink ? ["link_in_opening"] : [])],
+        violations: [...(guard.ok ? [] : guard.violations), ...(tooLong ? ["too_long"] : []), ...(hasLink ? ["link_in_opening"] : []), ...(postMissing ? ["no_real_post_referenced"] : [])],
       });
     }
     throw new ClaimsGuardError(["opening_refused_twice"]);

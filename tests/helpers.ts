@@ -19,6 +19,7 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     CHROME_CDP_URL: "http://127.0.0.1:9222",
     CHROME_PROFILE_DIR: "./.chrome-profile",
     BROWSER_SEND_ENABLED: false,
+    FOLLOW_BEFORE_DM: true,
     INSTAGRAM_APP_SECRET: "secret",
     INSTAGRAM_PAGE_ACCESS_TOKEN: "token",
     INSTAGRAM_WEBHOOK_VERIFY_TOKEN: "verify",
@@ -55,7 +56,7 @@ export function fakeTransport(canned: CannedAi, calls: Array<{ purpose: string; 
     if (canned.failStatus) return { status: canned.failStatus, data: { error: { message: "boom" } } };
     const content =
       purpose === "opening"
-        ? { detail_used: canned.opening?.detail_used ?? "bio", message: canned.opening?.message ?? "Vi que você fala de ortodontia nos seus vídeos. Como você decide o tema de cada um?" }
+        ? { post_index: 1, detail_used: canned.opening?.detail_used ?? "bio", message: canned.opening?.message ?? "Oi! Vi que você fala de ortodontia nos seus vídeos de um jeito simples. Estou desenvolvendo um app para quem grava vídeo e procuro gente para testar e dar feedback; um não também me ajuda. Posso te mandar para experimentar?" }
         : purpose === "classify"
           ? { intent: canned.classify?.intent ?? "asked_info", confidence: canned.classify?.confidence ?? 0.9, summary: canned.classify?.summary ?? "perguntou", objection: canned.classify?.objection ?? "" }
           : { action: canned.decide?.action ?? "reply", reply: canned.decide?.reply ?? "Eu ajudo profissionais a gravar vídeo com roteiro pronto. O primeiro roteiro é grátis.", follow_up_hours: canned.decide?.follow_up_hours ?? 0, pipeline_hint: canned.decide?.pipeline_hint ?? "none", reasoning: canned.decide?.reasoning ?? "teste" };
@@ -94,6 +95,10 @@ export const SAMPLE_PROFILES: FakeBrowserOptions["profiles"] = [
     externalUrl: "https://wa.me/5519999999999",
     location: "Campinas, SP",
     recentPostsSummary: "Reels sobre alinhadores e dúvidas de pacientes",
+    recentPosts: [
+      { url: "https://www.instagram.com/reel/abc123/", caption: "Alinhador invisível dói? Gravei esse vídeo respondendo as 3 dúvidas que mais chegam no consultório.", postedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), kind: "reel" },
+      { url: "https://www.instagram.com/p/def456/", caption: "Antes e depois de 8 meses de tratamento. Obrigada pela confiança!", postedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(), kind: "post" },
+    ],
     lastPublicPostAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
     keywords: ["dentista", "odontologia"],
   },

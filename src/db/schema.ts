@@ -28,6 +28,9 @@ export const leads = sqliteTable(
     externalUrl: text("external_url"),
     location: text("location"),
     recentPostsSummary: text("recent_posts_summary"),
+    /** JSON array of RecentPost ({url, caption, postedAt, kind}) read from the public profile. */
+    recentPosts: text("recent_posts").notNull().default("[]"),
+    followedAt: text("followed_at"),
     lastPublicPostAt: text("last_public_post_at"),
     source: text("source").notNull(),
     sourceDetail: text("source_detail"),

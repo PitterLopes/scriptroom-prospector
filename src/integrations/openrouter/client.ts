@@ -112,6 +112,8 @@ export class OpenRouterClient {
       ],
       max_tokens: request.maxTokens ?? 700,
       temperature: request.temperature ?? 0.6,
+      // Reasoning off by default (same choice as the Scriptroom server): it burns the token budget on text nobody reads.
+      reasoning: { enabled: false },
       usage: { include: true },
       provider: {
         data_collection: "deny",

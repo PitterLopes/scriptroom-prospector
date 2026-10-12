@@ -2,10 +2,12 @@ import type { DiscoveredProfile } from "@/db/queries/leads";
 
 export type ProfileCandidate = { username: string; fullName?: string | null; sourceDetail: string };
 
-export type PublicProfile = Omit<DiscoveredProfile, "source" | "sourceDetail"> & { username: string; exists: boolean; isPrivate: boolean };
+export type RecentPost = { url: string; caption: string; postedAt: string | null; kind: "post" | "reel" };
+
+export type PublicProfile = Omit<DiscoveredProfile, "source" | "sourceDetail"> & { username: string; exists: boolean; isPrivate: boolean; recentPosts?: RecentPost[] };
 
 export type SendOutcome =
-  | { status: "sent"; sentAt: string }
+  | { status: "sent"; sentAt: string; followed: boolean }
   | { status: "dry_run"; typedChars: number }
   | { status: "failed"; error: string; artifacts?: FailureArtifacts };
 
@@ -18,7 +20,7 @@ export type FailureArtifacts = {
   jobId: string;
 };
 
-export type SendOptions = { dryRun: boolean; jobId: string; random?: () => number };
+export type SendOptions = { dryRun: boolean; jobId: string; random?: () => number; followFirst?: boolean };
 
 /**
  * Everything the worker needs from Instagram's web interface. Two implementations:

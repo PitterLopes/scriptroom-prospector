@@ -94,7 +94,7 @@ export const sendFirstDm: JobHandler = async (job, ctx) => {
     const outcome = await withBrowserLock(async () => {
       const browser = ctx.browser();
       await browser.connect();
-      return browser.sendDirectMessage(lead.username, text, { dryRun, jobId: job.id, random: ctx.random });
+      return browser.sendDirectMessage(lead.username, text, { dryRun, jobId: job.id, random: ctx.random, followFirst: ctx.env.FOLLOW_BEFORE_DM });
     });
     if (outcome.status === "sent") {
       updateMessage(ctx.db, row.id, { status: "sent", sentAt: outcome.sentAt });
@@ -102,8 +102,9 @@ export const sendFirstDm: JobHandler = async (job, ctx) => {
       const contacted = movePipeline(ctx.db, lead, "contacted", "browser", "first DM sent");
       const sent = moveChannel(ctx.db, contacted, "browser_contact_sent", "browser");
       moveChannel(ctx.db, sent, "waiting_inbound_reply", "browser");
-      updateLeadFields(ctx.db, lead.id, { nextAction: "Aguardar resposta", nextActionAt: null });
-      recordLeadEvent(ctx.db, lead.id, "first_dm_sent", "browser", { variant: variant.name, text, sentAt: outcome.sentAt });
+      updateLeadFields(ctx.db, lead.id, { nextAction: "Aguardar resposta", nextActionAt: null, followedAt: outcome.followed ? outcome.sentAt : lead.followedAt });
+      if (outcome.followed) recordLeadEvent(ctx.db, lead.id, "followed", "browser", { before: "first_dm" });
+      recordLeadEvent(ctx.db, lead.id, "first_dm_sent", "browser", { variant: variant.name, text, sentAt: outcome.sentAt, followed: outcome.followed });
       return done("sent");
     }
     if (outcome.status === "dry_run") {

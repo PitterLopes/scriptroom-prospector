@@ -37,11 +37,12 @@ export const enrichAndScore: JobHandler = async (job, ctx) => {
       externalUrl: profile.externalUrl ?? lead.externalUrl,
       location: profile.location ?? lead.location,
       recentPostsSummary: profile.recentPostsSummary ?? lead.recentPostsSummary,
+      recentPosts: profile.recentPosts ? JSON.stringify(profile.recentPosts) : lead.recentPosts,
       lastPublicPostAt: profile.lastPublicPostAt ?? lead.lastPublicPostAt,
     });
     const refreshed = getLead(ctx.db, leadId)!;
     const mentionsUs = new RegExp(ctx.config.company.name, "i").test(`${refreshed.bio ?? ""} ${refreshed.externalUrl ?? ""}`);
-    const score = scoreProfile(refreshed, ctx.config);
+    const score = scoreProfile({ ...refreshed, recentPosts: JSON.parse(refreshed.recentPosts) as Array<{ caption: string; postedAt: string | null; kind: "post" | "reel" }> }, ctx.config);
     updateLeadFields(ctx.db, leadId, {
       icpScore: score.score,
       icpReasons: JSON.stringify(score.reasons),

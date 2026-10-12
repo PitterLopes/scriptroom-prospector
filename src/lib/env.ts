@@ -17,6 +17,8 @@ const envSchema = z.object({
   CHROME_CDP_URL: z.string().url().default("http://127.0.0.1:9222"),
   CHROME_PROFILE_DIR: z.string().default("./.chrome-profile"),
   BROWSER_SEND_ENABLED: boolFromString.default(false),
+  /** Follow the person right before the first DM (real sends only; never in dry-run). */
+  FOLLOW_BEFORE_DM: boolFromString.default(true),
 
   INSTAGRAM_APP_SECRET: z.string().optional(),
   INSTAGRAM_PAGE_ACCESS_TOKEN: z.string().optional(),
@@ -33,7 +35,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default("./data/prospector.db"),
   BACKUP_DIR: z.string().default("./backups"),
 
-  MAX_DMS_PER_DAY: z.coerce.number().int().min(1).max(200).default(30),
+  MAX_DMS_PER_DAY: z.coerce.number().int().min(1).max(200).default(15),
   MIN_SECONDS_BETWEEN_DMS: z.coerce.number().int().min(10).default(90),
   MAX_SECONDS_BETWEEN_DMS: z.coerce.number().int().min(10).default(240),
   OPERATING_HOURS: operatingHours.default("09:00-20:00"),

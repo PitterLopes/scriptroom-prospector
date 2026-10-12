@@ -94,6 +94,7 @@ export const EVENT_LABELS: Record<string, string> = {
   opening_written: "IA escreveu a abertura",
   opening_refused: "Abertura recusada pelo verificador",
   first_dm_sent: "Primeira mensagem enviada",
+  followed: "Passou a seguir a pessoa",
   first_dm_dry_run: "Primeira mensagem simulada",
   channel_handoff: "Conversa passou para a API",
   ig_user_id_linked: "Conta da Meta vinculada",

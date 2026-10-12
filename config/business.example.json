@@ -1,5 +1,8 @@
 {
-  "owner": { "name": "{{SEU_NOME}}", "role": "{{SEU_CARGO}}" },
+  "owner": {
+    "name": "{{SEU_NOME}}",
+    "role": "{{SEU_CARGO}}"
+  },
   "company": {
     "name": "{{NOME_DA_EMPRESA}}",
     "website": "{{SITE_DA_EMPRESA}}",
@@ -12,23 +15,58 @@
   },
   "offer": {
     "oneLinePitch": "{{o que a empresa resolve, em uma frase}}",
-    "howItWorks": ["{{passo 1}}", "{{passo 2}}", "{{passo 3}}"],
+    "howItWorks": [
+      "{{passo 1}}",
+      "{{passo 2}}",
+      "{{passo 3}}"
+    ],
     "revenueModel": "{{como a empresa ganha dinheiro}}",
-    "marketJargon": { "{{termo do nicho}}": "{{o que significa}}" }
+    "marketJargon": {
+      "{{termo do nicho}}": "{{o que significa}}"
+    },
+    "founderStory": "{{quem você é, por que está construindo isso e o que uma resposta — até um \\\"não\\\" — faz por você}}"
   },
   "claims": {
-    "verified": ["{{afirmação JÁ comprovada — só estas podem ser enviadas}}"],
-    "unverified": ["{{afirmação a comprovar — BLOQUEADA até virar prova}}"],
-    "forbiddenTopics": ["{{assunto que a IA nunca toca}}"]
+    "verified": [
+      "{{afirmação JÁ comprovada — só estas podem ser enviadas}}"
+    ],
+    "unverified": [
+      "{{afirmação a comprovar — BLOQUEADA até virar prova}}"
+    ],
+    "forbiddenTopics": [
+      "{{assunto que a IA nunca toca}}"
+    ]
   },
   "icp": {
-    "segments": ["{{segmento 1}}", "{{segmento 2}}", "{{segmento 3}}"],
-    "keywords": ["{{palavra 1}}", "{{palavra 2}}", "{{palavra 3}}"],
-    "hashtags": ["{{hashtag1}}", "{{hashtag2}}"],
+    "segments": [
+      "{{segmento 1}}",
+      "{{segmento 2}}",
+      "{{segmento 3}}"
+    ],
+    "keywords": [
+      "{{palavra 1}}",
+      "{{palavra 2}}",
+      "{{palavra 3}}"
+    ],
+    "hashtags": [
+      "{{hashtag1}}",
+      "{{hashtag2}}"
+    ],
     "geography": "{{região}}",
     "language": "pt-BR",
-    "followerRange": { "min": 300, "max": 100000 },
-    "exclude": ["{{tipo de perfil que não interessa}}"]
+    "followerRange": {
+      "min": 300,
+      "max": 100000
+    },
+    "exclude": [
+      "{{tipo de perfil que não interessa}}"
+    ]
   },
-  "affiliates": { "enabled": false, "topics": ["{{tema 1}}", "{{tema 2}}"] }
+  "affiliates": {
+    "enabled": false,
+    "topics": [
+      "{{tema 1}}",
+      "{{tema 2}}"
+    ]
+  }
 }

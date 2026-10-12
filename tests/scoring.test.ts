@@ -18,8 +18,13 @@ describe("scoreProfile", () => {
     const score = scoreProfile(SAMPLE_PROFILES![0]!, TEST_CONFIG);
     expect(score.qualified).toBe(true);
     expect(score.roleGuess).toBe("owner");
-    expect(score.segment).toContain("dentista");
+    expect(score.reasons.some((r) => r.includes("reel"))).toBe(true);
     expect(score.score).toBeGreaterThanOrEqual(50);
+  });
+  it("never qualifies a profile without a readable post, however good the bio", () => {
+    const score = scoreProfile({ ...SAMPLE_PROFILES![0]!, recentPosts: [] }, TEST_CONFIG);
+    expect(score.qualified).toBe(false);
+    expect(score.reasons).toContain("no public post could be read");
   });
   it("rejects a student", () => {
     const score = scoreProfile(SAMPLE_PROFILES![1]!, TEST_CONFIG);

@@ -8,16 +8,23 @@ import type { OpeningVariantConfig } from "@/integrations/openrouter/prompts";
 import { pickVariant, reviewExperiment, type VariantStats } from "./assign";
 import { audit } from "@/db/queries/events";
 
-export const OPENING_EXPERIMENT = "opening_style";
+export const OPENING_EXPERIMENT = "opening_style_honest";
+const RETIRED_EXPERIMENTS = ["opening_style"];
 
 const DEFAULT_OPENING_VARIANTS: Array<{ name: string; isControl: boolean; config: OpeningVariantConfig }> = [
-  { name: "Pergunta curiosa", isControl: true, config: { style: "curious_question", mentionWork: false } },
-  { name: "Elogio específico", isControl: false, config: { style: "specific_compliment", mentionWork: false } },
-  { name: "Observação de colega", isControl: false, config: { style: "peer_observation", mentionWork: true } },
+  { name: "Honesta, pedido completo", isControl: true, config: { style: "honest_ask" } },
+  { name: "Honesta, curta", isControl: false, config: { style: "honest_short" } },
+  { name: "Honesta, de colega", isControl: false, config: { style: "honest_peer" } },
 ];
 
 /** The first experiment ships with the system: three opening styles, one variable, control included. */
 export function ensureOpeningExperiment(db: Db, funnel: Funnel = "customers"): Experiment {
+  for (const retired of RETIRED_EXPERIMENTS) {
+    db.update(experiments)
+      .set({ status: "concluded", concludedAt: nowIso(), updatedAt: nowIso() })
+      .where(and(eq(experiments.variable, retired), eq(experiments.status, "running")))
+      .run();
+  }
   const existing = db
     .select()
     .from(experiments)
@@ -27,7 +34,7 @@ export function ensureOpeningExperiment(db: Db, funnel: Funnel = "customers"): E
   const now = nowIso();
   const id = newId();
   db.insert(experiments)
-    .values({ id, name: "Estilo da primeira mensagem", variable: OPENING_EXPERIMENT, funnel, status: "running", explorationShare: 0.2, minSampleSize: 30, createdAt: now, updatedAt: now })
+    .values({ id, name: "Primeira mensagem honesta: como pedir", variable: OPENING_EXPERIMENT, funnel, status: "running", explorationShare: 0.2, minSampleSize: 30, createdAt: now, updatedAt: now })
     .run();
   for (const v of DEFAULT_OPENING_VARIANTS) {
     db.insert(experimentVariants)

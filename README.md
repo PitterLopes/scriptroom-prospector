@@ -26,7 +26,12 @@ discover_profiles ──► enrich_and_score ──► send_first_dm (Chrome via
   text passes `checkClaims` (superlatives, guarantees, reach promises, unverified prices/percentages/social
   proof, competitors, credential requests, foreign links). A refused reply is retried once with the violations,
   then the lead goes to human review.
-- **Human pace, by design.** Daily cap with a warm-up schedule, random spacing, operating hours in the operator's
+- **Content-first targeting.** Discovery queries come from the ICP, but qualification is about content: a lead needs
+  readable recent posts (ideally reels); up to three are read and the opening must compliment one of them (validated
+  by index in code). The worker follows the person right before the first DM on real sends.
+- **Honest opening.** The first DM says who is writing, that the app is being built without outside money, asks for a
+  test and feedback, and states that a "no" helps too. Three variants of that ask are the shipped experiment.
+- **Human pace, by design.** Daily cap (15 by default) with a warm-up schedule, random spacing, operating hours in the operator's
   timezone, per-character typing delay. Instagram restrictions, lost sessions, repeated send failures, opt-out
   spikes, duplicate sends and the AI budget all pause the system automatically.
 - **Dry-run by default.** `BROWSER_SEND_ENABLED=false` means the worker does everything except press Enter.

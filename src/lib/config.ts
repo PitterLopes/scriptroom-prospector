@@ -18,6 +18,8 @@ const businessSchema = z.object({
     oneLinePitch: z.string().min(10),
     howItWorks: z.array(z.string().min(1)).min(1),
     revenueModel: z.string().min(1),
+    /** Honest first-person context for the first DM: who is writing, why, and what a reply (even a "no") does for them. */
+    founderStory: z.string().min(20),
     marketJargon: z.record(z.string(), z.string()),
   }),
   claims: z.object({

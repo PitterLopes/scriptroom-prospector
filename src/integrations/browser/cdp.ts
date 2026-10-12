@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
-import type { FailureArtifacts, InstagramBrowser, ProfileCandidate, PublicProfile, SendOptions, SendOutcome } from "./types";
+import type { FailureArtifacts, InstagramBrowser, ProfileCandidate, PublicProfile, RecentPost, SendOptions, SendOutcome } from "./types";
 import { BrowserUnavailableError, InstagramRestrictionError } from "./types";
 import { typingPlan } from "@/features/campaigns/limits";
 import { logger } from "@/lib/logger";
@@ -9,6 +9,7 @@ import { normalizeUsername } from "@/features/leads/dedupe";
 
 const log = logger("browser");
 const INSTAGRAM_HOST = /(^|\.)instagram\.com$/;
+const MAX_POSTS_TO_READ = 3;
 const RESTRICTION_TEXT = /(try again later|tente novamente mais tarde|we restrict certain activity|restringimos certas atividades|suspicious|suspeita|confirm it's you|confirme que é você|challenge)/i;
 const LOGIN_TEXT = /(log in|entrar|phone number, username, or email|telefone, nome de usuário ou email)/i;
 
@@ -125,6 +126,13 @@ export class RealInstagramBrowser implements InstagramBrowser {
       const fullName = parseOgName(title) ?? null;
       const headerLines = headerText.split("\n").map((l) => l.trim()).filter(Boolean);
       const bio = extractBio(headerLines, handle, fullName);
+      const postLinks = isPrivate ? [] : await this.collectPostLinks(page, handle);
+      const recentPosts: RecentPost[] = [];
+      for (const link of postLinks.slice(0, MAX_POSTS_TO_READ)) {
+        const post = await this.readPost(page, link);
+        if (post) recentPosts.push(post);
+      }
+      const lastPublicPostAt = recentPosts.map((p) => p.postedAt).filter((d): d is string => Boolean(d)).sort().reverse()[0] ?? null;
       const category = headerLines.find((l) => /^(dentista|advogad|cl[íi]nica|m[ée]dic|nutri|psic|personal|est[ée]tica|corretor|contador|consultor|servi[çc]o|sa[úu]de|educa|empres)/i.test(l) && l.length < 60) ?? null;
       return {
         username: handle,
@@ -139,10 +147,46 @@ export class RealInstagramBrowser implements InstagramBrowser {
         isBusiness: Boolean(category),
         externalUrl: external,
         location: null,
-        recentPostsSummary: null,
-        lastPublicPostAt: null,
+        recentPostsSummary: recentPosts.map((p) => `[${p.kind}] ${p.caption}`).join("\n") || null,
+        recentPosts,
+        lastPublicPostAt,
       };
     });
+  }
+
+  /** Post and reel permalinks in grid order (newest first), from the profile page. */
+  private async collectPostLinks(page: Page, handle: string): Promise<Array<{ url: string; kind: "post" | "reel" }>> {
+    const hrefs = await page.locator('main a[href*="/p/"], main a[href*="/reel/"]').evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).getAttribute("href") ?? ""));
+    const seen = new Set<string>();
+    const out: Array<{ url: string; kind: "post" | "reel" }> = [];
+    for (const href of hrefs) {
+      const match = /\/(p|reel)\/([A-Za-z0-9_-]+)\/?/.exec(href);
+      if (!match) continue;
+      const url = `https://www.instagram.com/${match[1]}/${match[2]}/`;
+      if (seen.has(url)) continue;
+      seen.add(url);
+      out.push({ url, kind: match[1] === "reel" ? "reel" : "post" });
+    }
+    log.debug("post links collected", { handle, count: out.length });
+    return out;
+  }
+
+  /** Opens one permalink and reads the caption and the date; a few seconds per post, like a person skimming. */
+  private async readPost(page: Page, link: { url: string; kind: "post" | "reel" }): Promise<RecentPost | null> {
+    try {
+      await this.goto(page, link.url);
+      await page.waitForTimeout(1500 + Math.floor(Math.random() * 1500));
+      await this.assertNotRestricted(page);
+      const description = (await page.locator('meta[property="og:description"]').getAttribute("content").catch(() => null)) ?? "";
+      const title = (await page.locator('meta[property="og:title"]').getAttribute("content").catch(() => null)) ?? "";
+      const datetime = await page.locator("time[datetime]").first().getAttribute("datetime").catch(() => null);
+      const caption = extractCaption(description, title);
+      if (!caption) return null;
+      return { url: link.url, caption: caption.slice(0, 400), postedAt: datetime ? new Date(datetime).toISOString() : null, kind: link.kind };
+    } catch (error: unknown) {
+      if (error instanceof InstagramRestrictionError) throw error;
+      return null;
+    }
   }
 
   async sendDirectMessage(username: string, text: string, options: SendOptions): Promise<SendOutcome> {
@@ -152,6 +196,17 @@ export class RealInstagramBrowser implements InstagramBrowser {
         await this.goto(page, `https://www.instagram.com/${handle}/`);
         await page.waitForTimeout(1500);
         await this.assertNotRestricted(page);
+        let followed = false;
+        if (options.followFirst && !options.dryRun) {
+          const follow = page.getByRole("button", { name: /^(follow|seguir)$/i }).first();
+          if ((await follow.count()) > 0) {
+            await follow.click();
+            await page.waitForTimeout(2000 + Math.floor(Math.random() * 3000));
+            await this.assertNotRestricted(page);
+            followed = true;
+            log.info("followed before messaging", { username: handle });
+          }
+        }
         const messageButton = page.getByRole("button", { name: /^(message|enviar mensagem|mensagem)$/i }).first();
         const messageLink = page.getByRole("link", { name: /^(message|enviar mensagem|mensagem)$/i }).first();
         if ((await messageButton.count()) > 0) await messageButton.click();
@@ -187,7 +242,7 @@ export class RealInstagramBrowser implements InstagramBrowser {
         const thread = await page.locator('div[role="main"], main').first().innerText({ timeout: 5000 }).catch(() => "");
         const confirmed = thread.replace(/\s+/g, " ").includes(text.slice(0, 40).replace(/\s+/g, " "));
         if (!confirmed) return { status: "failed", error: "message not visible in thread after sending", artifacts: await this.captureFailure(page, artifacts) };
-        return { status: "sent", sentAt: new Date().toISOString() };
+        return { status: "sent", sentAt: new Date().toISOString(), followed };
       } catch (error: unknown) {
         if (error instanceof InstagramRestrictionError) throw error;
         return { status: "failed", error: error instanceof Error ? error.message : String(error), artifacts: await this.captureFailure(page, artifacts) };
@@ -278,6 +333,19 @@ export function parseCompactNumber(raw: string): number | null {
   if (suffix === "k") return Math.round(value * 1000);
   if (suffix === "m") return Math.round(value * 1_000_000);
   return value;
+}
+
+/**
+ * Instagram's og:description for a post looks like
+ * `12 likes, 3 comments - user on October 1, 2026: "the caption..."`; og:title carries the same text on reels.
+ */
+export function extractCaption(description: string, title: string): string | null {
+  for (const text of [description, title]) {
+    const quoted = /:\s*[""“](.+?)[""”]\s*$/s.exec(text) ?? /:\s*[""“](.+)$/s.exec(text);
+    if (quoted?.[1]?.trim()) return quoted[1].trim();
+  }
+  const fallback = description.replace(/^[^:]*:\s*/, "").trim();
+  return fallback.length >= 8 ? fallback : null;
 }
 
 export function parseOgName(title: string): string | null {

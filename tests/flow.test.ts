@@ -67,7 +67,7 @@ describe("discovery → scoring → first DM", () => {
   });
 
   it("respects the daily allowance (warm-up) and postpones", async () => {
-    const extra = { username: "outra.dentista", exists: true, isPrivate: false, fullName: "Dra. B", bio: "Dentista CRO-PE 1 em Recife. Reels toda semana", followers: 2000, posts: 50, isBusiness: true, keywords: ["dentista"] };
+    const extra = { username: "outra.dentista", exists: true, isPrivate: false, fullName: "Dra. B", bio: "Dentista CRO-PE 1 em Recife. Reels toda semana", followers: 2000, posts: 50, isBusiness: true, keywords: ["dentista"], recentPosts: [{ url: "https://www.instagram.com/reel/x1/", caption: "Dica rápida: como escovar com aparelho", postedAt: new Date().toISOString(), kind: "reel" as const }] };
     const { ctx, db } = buildContext({ env: { BROWSER_SEND_ENABLED: true, WARMUP_START_PER_DAY: 1 }, browser: { profiles: [...SAMPLE_PROFILES!, extra] } });
     setSetting(db, "browser.sendEnabled", true);
     const ana = await discoverAndQualify(ctx, db);

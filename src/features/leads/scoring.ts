@@ -2,6 +2,7 @@ import type { BusinessConfig } from "@/lib/config";
 
 export type ProfileSignals = {
   username: string;
+  recentPosts?: Array<{ caption: string; postedAt: string | null; kind: "post" | "reel" }> | null;
   fullName?: string | null;
   bio?: string | null;
   category?: string | null;
@@ -52,7 +53,39 @@ function normalize(text: string): string {
 export function scoreProfile(profile: ProfileSignals, config: BusinessConfig): IcpScore {
   const reasons: string[] = [];
   let score = 0;
-  const haystack = normalize([profile.fullName, profile.bio, profile.category, profile.recentPostsSummary, profile.username].filter(Boolean).join(" \n "));
+  const posts = profile.recentPosts ?? [];
+  const postsText = posts.map((p) => p.caption).join(" \n ");
+  const haystack = normalize([profile.fullName, profile.bio, profile.category, profile.recentPostsSummary, postsText, profile.username].filter(Boolean).join(" \n "));
+
+  // The target is whoever already makes content (or is trying to), so content activity is the strongest signal.
+  const reels = posts.filter((p) => p.kind === "reel").length;
+  if (posts.length === 0) {
+    score -= 40;
+    reasons.push("no public post could be read");
+  } else {
+    score += 15;
+    reasons.push(`${posts.length} recent post(s) read`);
+    if (reels > 0) {
+      score += 15;
+      reasons.push(`${reels} reel(s) among them: records video`);
+    }
+    const spoken = posts.filter((p) => /\b(v[ií]deo|reels?|grav(ei|ando|o)|dica|explic|hoje eu|voc[êe] sabia|comenta)\b/i.test(p.caption)).length;
+    if (spoken > 0) {
+      score += 10;
+      reasons.push("captions sound like someone talking to an audience");
+    }
+    const newest = posts.map((p) => p.postedAt).filter((d): d is string => Boolean(d)).sort().reverse()[0];
+    if (newest) {
+      const days = (Date.now() - new Date(newest).getTime()) / 86_400_000;
+      if (days <= 14) {
+        score += 10;
+        reasons.push("posted in the last 2 weeks");
+      } else if (days > 45) {
+        score -= 15;
+        reasons.push("last post older than 45 days");
+      }
+    }
+  }
 
   const matchedKeywords = config.icp.keywords.filter((k) => haystack.includes(normalize(k)));
   if (matchedKeywords.length > 0) {
@@ -143,7 +176,8 @@ export function scoreProfile(profile: ProfileSignals, config: BusinessConfig): I
     segment,
     roleGuess,
     priority,
-    qualified: bounded >= 50 && roleGuess !== "employee",
+    // A person who publishes, who is not an employee or a student, and whose profile gave us a real post to talk about.
+    qualified: bounded >= 50 && roleGuess !== "employee" && posts.length > 0,
   };
 }
 

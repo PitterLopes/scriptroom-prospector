@@ -2,9 +2,12 @@ import type { BusinessConfig } from "@/lib/config";
 import type { Lead, Message } from "@/db/schema";
 import { INTENTS, ACTIONS, type Intent } from "@/features/conversations/intents";
 
+/**
+ * All three openings are honest about who is writing and why. They differ only in how the ask is made.
+ * The hypothesis being tested: honesty plus a low-cost way to say "no" earns more replies than a hook.
+ */
 export type OpeningVariantConfig = {
-  style: "curious_question" | "specific_compliment" | "peer_observation";
-  mentionWork: boolean;
+  style: "honest_ask" | "honest_short" | "honest_peer";
 };
 
 export const OPENING_SCHEMA = {
@@ -13,10 +16,11 @@ export const OPENING_SCHEMA = {
     type: "object",
     additionalProperties: false,
     properties: {
-      detail_used: { type: "string", description: "O detalhe real do perfil em que a mensagem se apoia." },
+      post_index: { type: "integer", description: "O número (1, 2, 3…) do post real elogiado na mensagem. 0 só se não houver post na lista." },
+      detail_used: { type: "string", description: "O que, naquele post, a mensagem elogia, em poucas palavras." },
       message: { type: "string", description: "A mensagem, pronta para enviar." },
     },
-    required: ["detail_used", "message"],
+    required: ["post_index", "detail_used", "message"],
   },
 } as const;
 
@@ -79,6 +83,21 @@ function claimsBlock(config: BusinessConfig): string {
   ].join("\n");
 }
 
+export function recentPostsOf(lead: Lead): Array<{ url: string; caption: string; postedAt: string | null; kind: "post" | "reel" }> {
+  try {
+    const parsed = JSON.parse(lead.recentPosts) as unknown;
+    return Array.isArray(parsed) ? (parsed as Array<{ url: string; caption: string; postedAt: string | null; kind: "post" | "reel" }>) : [];
+  } catch {
+    return [];
+  }
+}
+
+function postsBlock(lead: Lead): string {
+  const posts = recentPostsOf(lead);
+  if (posts.length === 0) return "POSTS RECENTES: nenhum lido.";
+  return ["POSTS RECENTES (reais, do perfil):", ...posts.map((p, i) => `${i + 1}. [${p.kind === "reel" ? "Reels" : "post"}${p.postedAt ? `, ${p.postedAt.slice(0, 10)}` : ""}] ${p.caption}`)].join("\n");
+}
+
 function profileBlock(lead: Lead): string {
   return [
     `@${lead.username}${lead.fullName ? ` (${lead.fullName})` : ""}`,
@@ -88,30 +107,34 @@ function profileBlock(lead: Lead): string {
     lead.followers != null ? `Seguidores: ${lead.followers}` : null,
     lead.segment ? `Segmento provável: ${lead.segment}` : null,
     `Papel provável: ${lead.roleGuess}`,
+    postsBlock(lead),
   ]
     .filter(Boolean)
     .join("\n");
 }
 
 const STYLE_GUIDE: Record<OpeningVariantConfig["style"], string> = {
-  curious_question: "Uma pergunta genuína sobre algo específico que a pessoa publicou ou escreveu na bio — a pergunta que um colega curioso faria.",
-  specific_compliment: "Um comentário específico e verdadeiro sobre um detalhe do perfil (não um elogio genérico), seguido de uma pergunta curta.",
-  peer_observation: "Uma observação de quem também grava vídeo para o trabalho: algo que você notou no jeito de a pessoa comunicar, e uma pergunta.",
+  honest_ask:
+    "Três partes, nesta ordem: (1) um elogio específico e verdadeiro a um detalhe do perfil; (2) quem escreve e por quê, com as palavras da história do fundador: está desenvolvendo o app sozinho, sem investimento de fora, para quem grava vídeo; (3) o pedido: testar o app e dizer o que achou ajudaria a continuar — e deixar claro que responder só 'não faz sentido para mim' já ajuda. Termina perguntando se pode mandar o app para a pessoa testar.",
+  honest_short:
+    "Mais curta: um elogio específico a um detalhe do perfil, uma frase dizendo que quem escreve está desenvolvendo um app para quem grava vídeo e procura gente para testar e dar feedback, e a pergunta se pode mandar para a pessoa experimentar. Uma frase final dizendo que um 'não' também ajuda.",
+  honest_peer:
+    "De colega para colega: quem escreve também grava vídeo para o próprio negócio e fez o app primeiro para si; um elogio específico ao perfil; e o pedido de ajuda: testar e contar o que não funcionou. Dizer que um 'não faz sentido' também ajuda, porque evita insistir com quem não precisa.",
 };
 
 export function openingPrompt(lead: Lead, variant: OpeningVariantConfig, config: BusinessConfig): { system: string; user: string } {
   const system = [
-    `Você escreve a primeira mensagem direta no Instagram em nome de ${config.owner.name} (${config.owner.role}). Português do Brasil, natural, de uma pessoa para outra.`,
+    `Você escreve a primeira mensagem direta no Instagram em nome de ${config.owner.name} (${config.owner.role}). Português do Brasil, natural, de uma pessoa para outra, na primeira pessoa.`,
+    `QUEM ESCREVE E POR QUÊ (use como verdade, com as suas palavras, sem ampliar): ${config.offer.founderStory}`,
+    `O QUE O APP FAZ, em uma frase, se precisar: ${config.offer.oneLinePitch}`,
     "Regras invioláveis:",
-    "- Soa como conversa pessoal, não campanha. Nada de 'Olá, tudo bem?' genérico, nada de texto de vendas, nada de lista.",
-    "- Apoie-se em UM detalhe real do perfil (bio, categoria ou publicação). Se não houver detalhe concreto, use a profissão e a cidade, nunca invente.",
+    "- Honesta do começo ao fim: diz quem é, o que está construindo e o que quer da pessoa. Nada de gancho, nada de mistério, nada de texto de vendas.",
+    "- Soa como uma pessoa pedindo ajuda a outra, não como campanha. Nada de 'Olá, tudo bem?' genérico, nada de lista, nada de emoji em série.",
+    "- A mensagem COMEÇA elogiando UM post real da lista POSTS RECENTES: diga o que aquele post específico tem de bom (a explicação, o exemplo, o jeito de falar), de forma que a pessoa reconheça que você viu o post. Elogio genérico ('adorei seu perfil', 'conteúdo top') está errado. Nunca invente um post nem atribua ao post algo que a legenda não mostra.",
     "- Nunca finja ser cliente ou paciente. Nunca use informação falsa para arrancar resposta.",
-    "- Não apresente o produto, não mande link, não fale de preço. A primeira mensagem só abre a conversa.",
-    variant.mentionWork
-      ? `- Pode dizer em meia frase que ${config.owner.name} trabalha com vídeo para profissionais, sem nomear o produto.`
-      : "- Não mencione o trabalho de quem escreve nesta mensagem.",
-    "- Máximo de 280 caracteres, uma ou duas frases, no máximo um emoji e só se couber.",
-    "- Termine com uma pergunta fácil de responder.",
+    "- Pode dizer o nome do app. Não manda link, não fala de preço, não promete resultado, não diz que é 'grátis' (só o primeiro roteiro é grátis, e isso fica para depois).",
+    "- Deixe explícito que um 'não' ou um 'não faz sentido para mim' também ajuda: é o que torna a resposta fácil.",
+    "- Entre 2 e 5 frases curtas, no máximo 480 caracteres. Termina com uma pergunta de sim ou não.",
     `Estilo pedido: ${STYLE_GUIDE[variant.style]}`,
   ].join("\n");
   const user = `PERFIL:\n${profileBlock(lead)}\n\nEscreva a mensagem.`;

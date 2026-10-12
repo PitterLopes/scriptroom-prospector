@@ -26,6 +26,7 @@ export type DiscoveredProfile = {
   externalUrl?: string | null;
   location?: string | null;
   recentPostsSummary?: string | null;
+  recentPosts?: Array<{ url: string; caption: string; postedAt: string | null; kind: "post" | "reel" }> | null;
   lastPublicPostAt?: string | null;
   source: string;
   sourceDetail?: string | null;
@@ -53,6 +54,7 @@ export function upsertDiscoveredLead(db: Db, funnel: Funnel, profile: Discovered
         externalUrl: profile.externalUrl ?? existing.externalUrl,
         location: profile.location ?? existing.location,
         recentPostsSummary: profile.recentPostsSummary ?? existing.recentPostsSummary,
+        recentPosts: profile.recentPosts ? JSON.stringify(profile.recentPosts) : existing.recentPosts,
         lastPublicPostAt: profile.lastPublicPostAt ?? existing.lastPublicPostAt,
         updatedAt: now,
       })
@@ -76,6 +78,7 @@ export function upsertDiscoveredLead(db: Db, funnel: Funnel, profile: Discovered
       externalUrl: profile.externalUrl ?? null,
       location: profile.location ?? null,
       recentPostsSummary: profile.recentPostsSummary ?? null,
+      recentPosts: JSON.stringify(profile.recentPosts ?? []),
       lastPublicPostAt: profile.lastPublicPostAt ?? null,
       source: profile.source,
       sourceDetail: profile.sourceDetail ?? null,

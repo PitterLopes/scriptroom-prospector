@@ -15,6 +15,7 @@ export type FakeBrowserOptions = {
 export class FakeInstagramBrowser implements InstagramBrowser {
   readonly kind = "fake" as const;
   readonly sent: Array<{ username: string; text: string; dryRun: boolean; jobId: string }> = [];
+  readonly followed: string[] = [];
   connected = false;
   private readonly profiles = new Map<string, FakeProfile>();
 
@@ -63,6 +64,8 @@ export class FakeInstagramBrowser implements InstagramBrowser {
     }
     this.sent.push({ username, text, dryRun: options.dryRun, jobId: options.jobId });
     if (options.dryRun) return { status: "dry_run", typedChars: text.length };
-    return { status: "sent", sentAt: new Date().toISOString() };
+    const followed = Boolean(options.followFirst);
+    if (followed) this.followed.push(username);
+    return { status: "sent", sentAt: new Date().toISOString(), followed };
   }
 }

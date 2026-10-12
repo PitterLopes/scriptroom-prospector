@@ -111,6 +111,20 @@ horário de operação, leitura e pontuação de cada perfil, e a primeira mensa
 
 Para rodar sem o painel: `npm run worker`. Para rodar uma passada só: `npm run worker:once`.
 
+## 6b. O que a primeira mensagem faz (decidido em 12/10/2026)
+
+- **Alvo:** quem já grava vídeo falando do próprio trabalho, ou está tentando. A profissão é só uma pista; o que
+  qualifica é ter post público recente, de preferência Reels. Perfil sem post legível não é abordado: não há o que
+  elogiar nem o que testar.
+- **Antes de mandar, o sistema lê até 3 posts da pessoa** (legenda e data) e **passa a seguir** o perfil (só no envio
+  real; `FOLLOW_BEFORE_DM=true` no `.env`).
+- **A mensagem é honesta do começo ao fim:** começa elogiando um post real (a IA tem de apontar qual, e o código
+  confere), diz que você está desenvolvendo o app sozinho e sem investimento de fora, pede o teste e o feedback, e
+  deixa claro que um "não faz sentido para mim" também ajuda. Sem link, sem preço, sem promessa. O texto base está em
+  `config/business.json › offer.founderStory`.
+- **Três variantes no experimento** (pedido completo, curta, de colega), medidas pela taxa de resposta.
+- **Ritmo:** 15 mensagens por dia no máximo, começando com 5 e subindo 5 por semana.
+
 ## 7. Testar, na ordem certa
 
 1. **Simulação completa, sem internet:** `npm run simulate`. Roda o fluxo inteiro com um Instagram falso, uma IA
@@ -120,7 +134,7 @@ Para rodar sem o painel: `npm run worker`. Para rodar uma passada só: `npm run 
    perfil, pontua, escreve a mensagem com a IA, **digita no campo e apaga sem enviar**. Você vê a mensagem na
    linha do tempo do lead, marcada "Simulada (não enviada)".
 3. **Piloto real, só quando você autorizar:** no `.env`, `BROWSER_SEND_ENABLED=true`, reinicie, e na faixa do topo
-   clique **"Ligar envio real"**. Começa com 5 mensagens por dia (aquecimento) e sobe 5 por semana até 30.
+   clique **"Ligar envio real"**. Começa com 5 mensagens por dia (aquecimento) e sobe 5 por semana até 15.
 
 Nada é enviado de verdade sem os dois passos do item 3.
 
