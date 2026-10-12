@@ -263,12 +263,14 @@ export class RealInstagramBrowser implements InstagramBrowser {
         if ((await messageButton.count()) > 0) await messageButton.click();
         else if ((await messageLink.count()) > 0) await messageLink.click();
         else return { status: "failed", error: "message button not found", artifacts: await this.captureFailure(page, artifacts) };
-        await page.waitForURL(/instagram\.com\/direct\//, { timeout: 15_000 });
-        await page.waitForTimeout(1500);
+        // Seen on 2026-10-12: the web client opens the thread as an inline panel on the profile page (the URL does
+        // not change), with an unnamed textbox. Older builds navigated to /direct/t/…; both end in a textbox.
+        await page.waitForTimeout(2500);
         await this.assertNotRestricted(page);
         const notNow = page.getByRole("button", { name: /^(not now|agora não)$/i }).first();
         if ((await notNow.count()) > 0) await notNow.click().catch(() => undefined);
-        const box = page.getByRole("textbox", { name: /message|mensagem/i }).first();
+        const named = page.getByRole("textbox", { name: /message|mensagem/i });
+        const box = (await named.count()) > 0 ? named.first() : page.getByRole("textbox").last();
         await box.waitFor({ state: "visible", timeout: 15_000 });
         await box.click();
         const plan = typingPlan(text, options.random);
@@ -290,7 +292,7 @@ export class RealInstagramBrowser implements InstagramBrowser {
         await page.keyboard.press("Enter");
         await page.waitForTimeout(2500);
         await this.assertNotRestricted(page);
-        const thread = await page.locator('div[role="main"], main').first().innerText({ timeout: 5000 }).catch(() => "");
+        const thread = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
         const confirmed = thread.replace(/\s+/g, " ").includes(text.slice(0, 40).replace(/\s+/g, " "));
         if (!confirmed) return { status: "failed", error: "message not visible in thread after sending", artifacts: await this.captureFailure(page, artifacts) };
         return { status: "sent", sentAt: new Date().toISOString(), followed };

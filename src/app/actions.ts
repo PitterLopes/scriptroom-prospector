@@ -124,7 +124,8 @@ export async function leadActionDispatcher(formData: FormData): Promise<void> {
       break;
     case "release_review":
       if (lead.channelState === "human_review_required") {
-        moveChannel(db, lead, lead.igUserId ? "api_active" : "waiting_inbound_reply", "operator", "liberado da revisão humana");
+        const neverContacted = !lead.contactedAt;
+        moveChannel(db, lead, lead.igUserId ? "api_active" : neverContacted ? "browser_contact_pending" : "waiting_inbound_reply", "operator", "liberado da revisão humana");
       }
       break;
     case "mark_registered":

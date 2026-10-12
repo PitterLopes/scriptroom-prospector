@@ -115,6 +115,7 @@ export const sendFirstDm: JobHandler = async (job, ctx) => {
       return done("dry-run");
     }
     updateMessage(ctx.db, row.id, { status: "failed", error: outcome.error });
+    releaseDedupeKey(ctx, row.id);
     moveChannel(ctx.db, lead, "human_review_required", "worker", outcome.error);
     raiseException(ctx.db, "send_failed", `First DM to @${lead.username} failed: ${outcome.error}`, { leadId: lead.id, jobId: job.id, payload: { ...outcome.artifacts, text } });
     noteSendFailure(ctx.db, now);
@@ -138,4 +139,9 @@ export const sendFirstDm: JobHandler = async (job, ctx) => {
 /** A browser outage is not a send: free the dedupe row so the retry can plan the message again. */
 function resetForRetry(ctx: WorkerContext, messageId: string): void {
   ctx.db.delete(messages).where(and(eq(messages.id, messageId), isNull(messages.sentAt))).run();
+}
+
+/** A failed attempt stays in the timeline but must not block the retry: only a sent message keeps the key. */
+function releaseDedupeKey(ctx: WorkerContext, messageId: string): void {
+  ctx.db.update(messages).set({ dedupeKey: null }).where(and(eq(messages.id, messageId), isNull(messages.sentAt))).run();
 }

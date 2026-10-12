@@ -92,7 +92,7 @@ const CHANNEL_TRANSITIONS: Record<ChannelState, readonly ChannelState[]> = {
   api_eligible: ["api_active", "api_window_closed", "human_review_required", "do_not_contact", "blocked", "completed"],
   api_active: ["api_window_closed", "human_review_required", "do_not_contact", "blocked", "completed"],
   api_window_closed: ["api_active", "human_review_required", "do_not_contact", "blocked", "completed"],
-  human_review_required: ["api_active", "api_eligible", "waiting_inbound_reply", "do_not_contact", "blocked", "completed"],
+  human_review_required: ["browser_contact_pending", "api_active", "api_eligible", "waiting_inbound_reply", "do_not_contact", "blocked", "completed"],
   do_not_contact: [],
   blocked: [],
   completed: [],
