@@ -262,7 +262,19 @@ export class RealInstagramBrowser implements InstagramBrowser {
         const messageLink = page.getByRole("link", { name: /^(message|enviar mensagem|mensagem)$/i }).first();
         if ((await messageButton.count()) > 0) await messageButton.click();
         else if ((await messageLink.count()) > 0) await messageLink.click();
-        else return { status: "failed", error: "message button not found", artifacts: await this.captureFailure(page, artifacts) };
+        else {
+          // Some profiles show no message button in the header (seen on 2026-10-12); it lives in the "Opções" menu.
+          const options = page.getByRole("button", { name: /^(opções|options)$/i }).first();
+          if ((await options.count()) === 0) return { status: "failed", error: "message button not found", artifacts: await this.captureFailure(page, artifacts) };
+          await options.click();
+          await page.waitForTimeout(1200);
+          const inMenu = page.locator('[role="dialog"]').getByRole("button", { name: /^(enviar mensagem|send message|mensagem|message)$/i }).first();
+          if ((await inMenu.count()) === 0) {
+            await page.keyboard.press("Escape");
+            return { status: "failed", error: "message option not found in the profile menu", artifacts: await this.captureFailure(page, artifacts) };
+          }
+          await inMenu.click();
+        }
         // Seen on 2026-10-12: the web client opens the thread as an inline panel on the profile page (the URL does
         // not change), with an unnamed textbox. Older builds navigated to /direct/t/…; both end in a textbox.
         await page.waitForTimeout(2500);
