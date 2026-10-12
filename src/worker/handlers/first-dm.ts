@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { messages } from "@/db/schema";
 import { parsePayload } from "@/db/queries/jobs";
 import { countBrowserDmsSentBetween, getLead, insertMessage, isDoNotContact, lastBrowserDmSentAt, moveChannel, movePipeline, updateLeadFields, updateMessage } from "@/db/queries/leads";
@@ -84,6 +84,8 @@ export const sendFirstDm: JobHandler = async (job, ctx) => {
 
   const dryRun = !ctx.sendEnabled();
   if (decision.waitSeconds > 0) await ctx.sleep(decision.waitSeconds * 1000);
+  // A row left "planned" by an interrupted attempt is not a send: free its key. Only sent or simulated rows block.
+  ctx.db.update(messages).set({ dedupeKey: null }).where(and(eq(messages.dedupeKey, `first_dm:${lead.id}`), inArray(messages.status, ["planned", "failed"]), isNull(messages.sentAt))).run();
   const row = insertMessage(ctx.db, { leadId: lead.id, direction: "outbound", channel: "browser", text, status: "planned", dedupeKey: `first_dm:${lead.id}`, variantId: variant.id });
   if (!row) {
     tripOnDuplicate(ctx.db, `first DM for @${lead.username} already exists`);
