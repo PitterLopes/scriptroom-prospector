@@ -10,6 +10,8 @@ import { normalizeUsername } from "@/features/leads/dedupe";
 const log = logger("browser");
 const INSTAGRAM_HOST = /(^|\.)instagram\.com$/;
 const MAX_POSTS_TO_READ = 3;
+/** Reading a profile is four page loads at most; anything longer is a stuck page, not a slow one. */
+const JOB_DEADLINE_MS = 150_000;
 const RESTRICTION_TEXT = /(try again later|tente novamente mais tarde|we restrict certain activity|restringimos certas atividades|suspicious|suspeita|confirm it's you|confirme que é você|challenge)/i;
 const LOGIN_TEXT = /(log in|entrar|phone number, username, or email|telefone, nome de usuário ou email)/i;
 
@@ -323,6 +325,8 @@ export class RealInstagramBrowser implements InstagramBrowser {
     if (!this.context) await this.connect();
     const context = this.context!;
     const page = await context.newPage();
+    page.setDefaultTimeout(8_000);
+    page.setDefaultNavigationTimeout(30_000);
     const artifacts = { consoleErrors: [] as string[], failedRequests: [] as string[], jobId };
     page.on("console", (msg) => {
       if (msg.type() === "error") artifacts.consoleErrors.push(msg.text().slice(0, 300));
@@ -339,9 +343,14 @@ export class RealInstagramBrowser implements InstagramBrowser {
         void page.close().catch(() => undefined);
       }
     });
+    let timer: NodeJS.Timeout | null = null;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`browser job exceeded ${JOB_DEADLINE_MS / 1000}s`)), JOB_DEADLINE_MS);
+    });
     try {
-      return await fn(page, artifacts);
+      return await Promise.race([fn(page, artifacts), deadline]);
     } finally {
+      if (timer) clearTimeout(timer);
       await page.close().catch(() => undefined);
     }
   }

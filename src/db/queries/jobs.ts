@@ -50,8 +50,8 @@ export function enqueue(db: Db, type: JobType, payload: Record<string, unknown>,
 }
 
 /** Returns running jobs whose lock expired to the pending state (worker crashed mid-job). */
-export function recoverStaleJobs(db: Db, now: Date = new Date()): number {
-  const cutoff = addSeconds(now, -STALE_LOCK_SECONDS).toISOString();
+export function recoverStaleJobs(db: Db, now: Date = new Date(), staleAfterSeconds: number = STALE_LOCK_SECONDS): number {
+  const cutoff = addSeconds(now, -staleAfterSeconds).toISOString();
   const result = db
     .update(jobs)
     .set({ status: "pending", lockedAt: null, lockedBy: null, updatedAt: now.toISOString() })

@@ -64,6 +64,9 @@ async function main(): Promise<void> {
   loadDotenv();
   const ctx = createContext();
   const once = process.argv.includes("--once");
+  // One worker per machine: anything still "running" at startup belongs to a process that is gone.
+  const recovered = recoverStaleJobs(ctx.db, ctx.now(), 0);
+  if (recovered > 0) ctx.log.info("recovered jobs left running by a previous process", { recovered });
   audit(ctx.db, "worker", "worker_started", ctx.workerId, { once, sendEnabled: ctx.sendEnabled() });
   ctx.log.info("worker started", { workerId: ctx.workerId, once, sendEnabled: ctx.sendEnabled(), browserFlag: ctx.env.BROWSER_SEND_ENABLED });
   let stopping = false;
