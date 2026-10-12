@@ -1,0 +1,22 @@
+# secrets and real business data
+.env
+.env.*
+!.env.example
+config/business.json
+
+# browser session and runtime artifacts
+.chrome-profile/
+*.db
+*.db-wal
+*.db-shm
+data/
+backups/
+screenshots/
+traces/
+
+# build
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts

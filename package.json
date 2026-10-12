@@ -1,0 +1,51 @@
+{
+  "name": "scriptroom-prospector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Autonomous Instagram prospecting for Scriptroom: browser first contact, official Meta API continuation, AI conversation engine, local CRM.",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "concurrently -n panel,worker -c blue,green \"next dev --port 3100\" \"npm run worker\"",
+    "start": "concurrently -n panel,worker -c blue,green \"next start --port 3100\" \"npm run worker\"",
+    "panel": "next dev --port 3100",
+    "worker": "tsx watch --clear-screen=false src/worker/index.ts",
+    "worker:once": "tsx src/worker/index.ts --once",
+    "build": "next build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:backup": "tsx src/db/backup.ts",
+    "db:restore": "tsx src/db/restore.ts",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "simulate": "tsx src/worker/simulate.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "13.0.3",
+    "concurrently": "10.0.6",
+    "drizzle-orm": "0.45.4",
+    "next": "16.4.0",
+    "playwright": "1.64.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "tsx": "4.23.15",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "drizzle-kit": "0.31.11",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}
