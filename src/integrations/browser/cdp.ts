@@ -67,6 +67,35 @@ export class RealInstagramBrowser implements InstagramBrowser {
     }
     this.context = context;
     log.info("connected to Chrome over CDP", { browser: probe.browser });
+    await this.closeLeftoverTabs(context);
+  }
+
+  /**
+   * A killed worker leaves its tabs open, possibly with a half-typed draft in a message box. The dedicated profile
+   * is ours: every Instagram tab that is not the plain home page was opened by a job. Clear any draft, then close.
+   */
+  private async closeLeftoverTabs(context: BrowserContext): Promise<void> {
+    for (const page of context.pages()) {
+      const url = page.url();
+      if (!/^https?:\/\/(www\.)?instagram\.com\/.+/.test(url) || /^https?:\/\/(www\.)?instagram\.com\/?$/.test(url)) continue;
+      try {
+        const boxes = page.getByRole("textbox");
+        const count = await boxes.count();
+        for (let i = 0; i < count; i += 1) {
+          const box = boxes.nth(i);
+          const text = (await box.innerText().catch(() => "")).trim();
+          if (!text) continue;
+          await box.click();
+          await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+          await page.keyboard.press("Backspace");
+          log.warn("cleared a draft left in a message box", { url, chars: text.length });
+        }
+      } catch {
+        // nothing to clear, or the page is gone
+      }
+      await page.close().catch(() => undefined);
+      log.info("closed a tab left by a previous run", { url });
+    }
   }
 
   async close(): Promise<void> {
@@ -288,9 +317,10 @@ export class RealInstagramBrowser implements InstagramBrowser {
         const plan = typingPlan(text, options.random);
         for (let i = 0; i < text.length; i += 1) {
           await page.keyboard.type(text[i]!, { delay: 0 });
-          await page.waitForTimeout(plan.perCharMs[i] ?? 60);
+          // Human cadence only matters for a real send; a dry-run types fast so an interruption leaves nothing behind.
+          await page.waitForTimeout(options.dryRun ? 4 : (plan.perCharMs[i] ?? 60));
         }
-        await page.waitForTimeout(plan.pauseBeforeSendMs);
+        await page.waitForTimeout(options.dryRun ? 300 : plan.pauseBeforeSendMs);
         const typed = (await box.innerText().catch(() => "")).trim();
         if (typed.replace(/\s+/g, " ") !== text.replace(/\s+/g, " ")) {
           await this.clearBox(page);
