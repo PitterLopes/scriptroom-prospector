@@ -191,9 +191,11 @@ CNPJ da DropDesk (o Scriptroom é produto dela) e aprovada no mesmo dia.
 
 **Como a conversa continua.** A pessoa responde quando quiser — hoje, amanhã, na semana que vem — e a IA continua
 o atendimento: toda mensagem dela reabre a janela de 24 h da Meta, e a resposta sai pela API dentro dessa janela.
-O que a IA **não** faz é tomar a iniciativa fora da janela: o follow-up (nosso "e aí, testou?") só sai pela API se
-a última mensagem dela tiver menos de 24 h; passado isso, o lead vai para "Janela de 24 h fechada" em Exceções, e
-você manda à mão pelo Instagram, se quiser. O sistema nunca manda follow-up pelo navegador.
+**O follow-up é um só, e sai dentro da janela** (decisão de 12/10/2026 à noite): 22 h depois da última mensagem
+dela, uma frase leve perguntando se chegou a testar e lembrando que "não fez sentido" também é resposta. Se ela
+não responder nas 24 h seguintes, o lead é encerrado pelo próprio sistema ("o app não fez sentido para ela"): o
+teste é rápido, e silêncio depois do follow-up é a resposta. O sistema nunca manda follow-up pelo navegador; fora
+da janela ele avisa em Exceções e você manda à mão, se quiser.
 
 **Quatro lições do primeiro dia, já consertadas no código:**
 

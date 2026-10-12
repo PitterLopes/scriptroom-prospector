@@ -196,10 +196,10 @@ export function decidePrompt(
     "- Objeção 'já tenho agência / freelancer / alguém que faz': não dispute. Use o POSICIONAMENTO: o app é alavanca para quem produz, e a pessoa pode repassar a quem cuida dos vídeos dela; se ela mesma aparece no vídeo, o roteiro e o teleprompter continuam sendo para ela.",
     "- not_the_owner ou will_forward: agradeça e pergunte, de forma leve, qual é a melhor forma de chegar a quem decide; nunca pressione.",
     "- not_interested: agradeça em uma frase e encerre (close). opt_out: encerre sem resposta nenhuma (close, reply vazio). close é SÓ para esses dois casos.",
-    "- Quando a pessoa diz que vai testar, agradece ou fecha a conversa sem pergunta pendente: schedule_follow_up em 48 h, SEMPRE com uma resposta de uma linha agradecendo e deixando a porta aberta para o feedback (nunca reply vazio: mensagem sem resposta parece descaso). Nunca close: quem vai testar continua em aberto.",
+    "- Quando a pessoa diz que vai testar, agradece ou fecha a conversa sem pergunta pendente: schedule_follow_up (follow_up_hours 20), SEMPRE com uma resposta de uma linha agradecendo e deixando a porta aberta para o feedback (nunca reply vazio: mensagem sem resposta parece descaso). Nunca close: quem vai testar continua em aberto.",
     "- needs_human ou qualquer pedido fora do que você pode responder: escalate_to_human, reply vazio.",
     "- ambiguous: faça uma pergunta curta para entender (ask).",
-    "- Follow-up só quando a pessoa sinalizou interesse e parou de responder: uma vez, leve, em 48 h (schedule_follow_up).",
+    "- Follow-up só quando a pessoa sinalizou interesse e parou de responder: uma vez só, leve (schedule_follow_up). O sistema marca a hora dentro da janela de 24 h da Meta; follow_up_hours é só um teto (use 20).",
     "- Resposta de até 2 parágrafos curtos, no máximo 500 caracteres. Sem link fora das ações que o pedem. Sem pedir dados pessoais, senha ou pagamento.",
     "- pipeline_hint: 'interested' quando a pessoa quer saber mais ou experimentar; 'closed' em not_interested, opt_out ou encerramento; 'none' no resto.",
     retryViolations && retryViolations.length > 0
@@ -214,7 +214,7 @@ export function decidePrompt(
 export function followUpPrompt(lead: Lead, history: Message[], config: BusinessConfig): { system: string; user: string } {
   const base = decidePrompt(lead, history, "interested", "follow_up", config);
   return {
-    system: `${base.system}\n\nESTA É UMA MENSAGEM DE FOLLOW-UP: a pessoa mostrou interesse e parou de responder. Uma frase leve que reabre a conversa sem cobrar resposta. Ação: reply.`,
+    system: `${base.system}\n\nESTA É A ÚNICA MENSAGEM DE FOLLOW-UP QUE VAI EXISTIR: a pessoa mostrou interesse e parou de responder. Uma ou duas frases leves: pergunte se chegou a testar e deixe claro, sem cobrar, que "não fez sentido pra mim" também é uma resposta que ajuda. O teste é rápido; não insista nem venda. Ação: reply.`,
     user: base.user,
   };
 }

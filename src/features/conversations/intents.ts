@@ -57,5 +57,6 @@ export function defaultActionFor(intent: Intent): ConversationAction {
   }
 }
 
-export const MAX_FOLLOW_UPS = 2;
+/** One follow-up, and only one: the test is quick, so silence after it means the app did not make sense (decided 2026-10-12). */
+export const MAX_FOLLOW_UPS = 1;
 export const FOLLOW_UP_DELAY_HOURS = [48, 96] as const;

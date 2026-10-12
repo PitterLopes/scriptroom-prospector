@@ -238,6 +238,25 @@ describe("handoff browser → webhook → API", () => {
     expect(fu.kind).toBe("done");
   });
 
+  it("schedules the follow-up inside Meta's 24 h window, sends it once, and closes the lead if she stays quiet", async () => {
+    let clock = new Date();
+    const { ctx, db, ana } = await contacted({ now: () => clock, ai: { classify: { intent: "interested", summary: "vai testar" }, decide: { action: "schedule_follow_up", reply: "Chegou a testar?", follow_up_hours: 48, pipeline_hint: "interested" } } });
+    const at = clock.toISOString();
+    await processInbound(job("process_inbound", { mid: "mid_w", senderId: "123", recipientId: "x", text: "Vou testar", timestamp: at, attachments: 0 }), ctx);
+    const due = new Date(getLead(db, ana.id)!.nextActionAt!);
+    expect(due.getTime() - clock.getTime()).toBeLessThanOrEqual(22 * 3600 * 1000);
+    expect(due.getTime() - clock.getTime()).toBeGreaterThan(21 * 3600 * 1000);
+    clock = new Date(due.getTime() + 60_000);
+    expect(await followUp(job("follow_up", { leadId: ana.id }), ctx)).toMatchObject({ kind: "done", note: "follow-up queued" });
+    expect(getLead(db, ana.id)!.nextAction).toBe("Encerrar se não responder");
+    expect(listJobs(db).filter((j) => j.type === "send_api_reply" && JSON.parse(j.payload).action === "follow_up")).toHaveLength(1);
+    clock = new Date(clock.getTime() + 25 * 3600 * 1000);
+    expect(await followUp(job("follow_up", { leadId: ana.id }), ctx)).toMatchObject({ kind: "done", note: "no reply after the follow-up; closed" });
+    const after = getLead(db, ana.id)!;
+    expect(after.pipelineState).toBe("closed");
+    expect(after.channelState).toBe("completed");
+  });
+
   it("honors opt-out immediately and permanently", async () => {
     const { ctx, db, ana } = await contacted();
     await processInbound(job("process_inbound", { mid: "mid_3", senderId: "123", recipientId: "x", text: "Para de me mandar mensagem, por favor", timestamp: new Date().toISOString(), attachments: 0 }), ctx);

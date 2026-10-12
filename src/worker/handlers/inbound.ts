@@ -7,6 +7,7 @@ import type { Lead, Message } from "@/db/schema";
 import type { Funnel, PipelineState } from "@/features/leads/states";
 import { canMovePipeline } from "@/features/leads/states";
 import { addSeconds } from "@/lib/time";
+import { FOLLOW_UP_BEFORE_WINDOW_HOURS, followUpInstant } from "@/features/conversations/timing";
 import type { WorkerContext } from "../context";
 import { isSystemPaused, noteOptOut } from "../safety";
 import { done, postpone, type JobHandler } from "./types";
@@ -111,14 +112,15 @@ export const processInbound: JobHandler = async (job, ctx) => {
     if (decision.reply) {
       enqueue(ctx.db, "send_api_reply", { leadId: current.id, text: decision.reply, dedupeKey: `reply:${payload.mid}`, action: decision.action }, { idempotencyKey: `reply:${payload.mid}`, leadId: current.id, maxAttempts: 4 });
     }
-    if (decision.action === "schedule_follow_up" && decision.followUpHours) {
-      updateLeadFields(ctx.db, current.id, { nextAction: "Follow-up", nextActionAt: addSeconds(now, decision.followUpHours * 3600).toISOString() });
+    const latestInboundAt = unanswered[unanswered.length - 1]?.sentAt ?? payload.timestamp;
+    if (decision.action === "schedule_follow_up") {
+      updateLeadFields(ctx.db, current.id, { nextAction: "Follow-up", nextActionAt: followUpInstant(now, latestInboundAt, decision.followUpHours ?? FOLLOW_UP_BEFORE_WINDOW_HOURS).toISOString() });
     } else if (decision.action === "close") {
       const closed = movePipelineSafe(ctx, current, "closed", decision.reasoning);
       moveChannel(ctx.db, closed, "completed", "ai", decision.reasoning);
       updateLeadFields(ctx.db, current.id, { nextAction: null, nextActionAt: null });
     } else if (decision.action === "send_store_link") {
-      updateLeadFields(ctx.db, current.id, { nextAction: "Acompanhar instalação", nextActionAt: addSeconds(now, 72 * 3600).toISOString() });
+      updateLeadFields(ctx.db, current.id, { nextAction: "Follow-up: chegou a testar?", nextActionAt: followUpInstant(now, latestInboundAt, FOLLOW_UP_BEFORE_WINDOW_HOURS).toISOString() });
     } else {
       updateLeadFields(ctx.db, current.id, { nextAction: "Aguardar resposta", nextActionAt: null });
     }

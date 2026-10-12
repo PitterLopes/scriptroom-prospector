@@ -1,8 +1,10 @@
 import { parsePayload, enqueue } from "@/db/queries/jobs";
-import { getLead, getOrCreateConversation, listMessages, moveChannel, updateConversation, updateLeadFields } from "@/db/queries/leads";
+import { getLead, getOrCreateConversation, listMessages, moveChannel, movePipeline, updateConversation, updateLeadFields } from "@/db/queries/leads";
 import { raiseException, recordLeadEvent } from "@/db/queries/events";
 import { apiWindowOpen } from "@/integrations/instagram/graph";
 import { MAX_FOLLOW_UPS } from "@/features/conversations/intents";
+import { CLOSE_AFTER_FOLLOW_UP_HOURS } from "@/features/conversations/timing";
+import { canMovePipeline, type Funnel, type PipelineState } from "@/features/leads/states";
 import { BudgetExceededError } from "@/integrations/openrouter/client";
 import { addSeconds } from "@/lib/time";
 import { isSystemPaused } from "../safety";
@@ -25,8 +27,13 @@ export const followUp: JobHandler = async (job, ctx) => {
     return done("lead already replied; no follow-up needed");
   }
   if (conversation.followUpsSent >= MAX_FOLLOW_UPS) {
+    // The one follow-up went out and the person stayed quiet. The test takes minutes: silence is the answer.
+    const reason = "sem resposta depois do follow-up: o app não fez sentido para ela";
+    const closed = canMovePipeline(lead.funnel as Funnel, lead.pipelineState as PipelineState, "closed") ? movePipeline(ctx.db, lead, "closed", "worker", reason) : lead;
+    moveChannel(ctx.db, closed, "completed", "worker", reason);
     updateLeadFields(ctx.db, lead.id, { nextAction: null, nextActionAt: null });
-    return done("follow-up limit reached");
+    recordLeadEvent(ctx.db, lead.id, "closed_after_follow_up", "worker", { followUpsSent: conversation.followUpsSent });
+    return done("no reply after the follow-up; closed");
   }
   if (!apiWindowOpen(conversation.apiWindowExpiresAt, now)) {
     moveChannel(ctx.db, lead, "api_window_closed", "worker", "follow-up outside the 24h window");
@@ -41,7 +48,7 @@ export const followUp: JobHandler = async (job, ctx) => {
     const dedupeKey = `followup:${lead.id}:${conversation.followUpsSent + 1}`;
     enqueue(ctx.db, "send_api_reply", { leadId: lead.id, text: decision.reply, dedupeKey, action: "follow_up" }, { idempotencyKey: dedupeKey, leadId: lead.id, maxAttempts: 3 });
     updateConversation(ctx.db, conversation.id, { followUpsSent: conversation.followUpsSent + 1 });
-    updateLeadFields(ctx.db, lead.id, { nextAction: "Aguardar resposta", nextActionAt: null });
+    updateLeadFields(ctx.db, lead.id, { nextAction: "Encerrar se não responder", nextActionAt: addSeconds(now, CLOSE_AFTER_FOLLOW_UP_HOURS * 3600).toISOString() });
     recordLeadEvent(ctx.db, lead.id, "follow_up_scheduled", "ai", { number: conversation.followUpsSent + 1, reasoning: decision.reasoning });
     return done("follow-up queued");
   } catch (error: unknown) {
