@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   const file = path.resolve(process.cwd(), "data/simulation.db");
   for (const suffix of ["", "-wal", "-shm"]) if (fs.existsSync(file + suffix)) fs.unlinkSync(file + suffix);
   const { db } = openDatabase(file);
-  const e = { ...env(), BROWSER_SEND_ENABLED: true, OPERATING_HOURS: "00:00-23:59", DATABASE_URL: file };
+  const e = { ...env(), BROWSER_SEND_ENABLED: true, OPERATING_HOURS: "00:00-23:59", DATABASE_URL: file, BACKUP_DIR: "./data/simulation-backups" };
   const config = business();
   const ai = realAi && e.OPENROUTER_API_KEY ? OpenRouterClient.fromEnv(db) : new OpenRouterClient(db, { apiKey: "fake", mainModel: e.OPENROUTER_MODEL, fastModel: e.OPENROUTER_MODEL_FAST, monthlyBudgetUsd: e.OPENROUTER_MONTHLY_BUDGET_USD, transport: fakeAiTransport() });
   const browser = new FakeInstagramBrowser({ profiles: PROFILES });
