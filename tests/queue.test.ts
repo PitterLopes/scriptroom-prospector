@@ -17,6 +17,18 @@ describe("durable job queue", () => {
     expect(claimNext(db, "w1", ["daily_backup", "review_experiments"], now)).toBeNull();
   });
 
+  it("claims by priority before due time: a reply beats a discovery that was due earlier", () => {
+    const db = openTestDatabase();
+    const now = new Date("2026-10-12T12:00:00Z");
+    enqueue(db, "discover_profiles", { q: 1 }, { runAt: new Date("2026-10-12T10:00:00Z") });
+    enqueue(db, "send_first_dm", { leadId: "a" }, { runAt: new Date("2026-10-12T11:00:00Z") });
+    enqueue(db, "send_api_reply", { leadId: "b" }, { runAt: new Date("2026-10-12T11:30:00Z") });
+    const types = ["discover_profiles", "send_first_dm", "send_api_reply"] as const;
+    expect(claimNext(db, "w", types, now)?.type).toBe("send_api_reply");
+    expect(claimNext(db, "w", types, now)?.type).toBe("send_first_dm");
+    expect(claimNext(db, "w", types, now)?.type).toBe("discover_profiles");
+  });
+
   it("idempotency keys collapse duplicates", () => {
     const db = openTestDatabase();
     expect(enqueue(db, "send_first_dm", { leadId: "a" }, { idempotencyKey: "first_dm:a" })).not.toBeNull();

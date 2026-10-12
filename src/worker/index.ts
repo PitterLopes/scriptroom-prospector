@@ -35,6 +35,8 @@ export async function runOnce(ctx: WorkerContext, maxJobs = 20): Promise<{ ran: 
   const { scheduled } = scheduleTick(ctx);
   let ran = 0;
   while (ran < maxJobs) {
+    // Re-plan every few jobs so a freshly qualified lead gets its DM scheduled without waiting for the whole pass.
+    if (ran > 0 && ran % 3 === 0) scheduleTick(ctx);
     const job = claimNext(ctx.db, ctx.workerId, ALL_TYPES, ctx.now());
     if (!job) break;
     ran += 1;

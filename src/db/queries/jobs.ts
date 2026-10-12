@@ -60,15 +60,31 @@ export function recoverStaleJobs(db: Db, now: Date = new Date(), staleAfterSecon
   return result.changes;
 }
 
-/** Atomically claims the next due job of the given types. SQLite's single writer makes the update-then-read safe. */
+/** Conversations first (a lead is waiting), then the day's DMs, then reading profiles, then discovery. */
+const PRIORITY: Record<JobType, number> = {
+  send_api_reply: 0,
+  process_inbound: 0,
+  follow_up: 1,
+  send_first_dm: 2,
+  enrich_and_score: 3,
+  discover_profiles: 4,
+  daily_backup: 5,
+  review_experiments: 5,
+};
+
+/** Atomically claims the next due job of the given types, by priority then by due time. SQLite's single writer makes the update-then-read safe. */
 export function claimNext(db: Db, workerId: string, types: readonly JobType[], now: Date = new Date()): Job | null {
   if (types.length === 0) return null;
   const nowText = now.toISOString();
+  const priorityCase = sql`CASE ${jobs.type} ${sql.join(
+    Object.entries(PRIORITY).map(([type, p]) => sql`WHEN ${type} THEN ${p}`),
+    sql` `,
+  )} ELSE 9 END`;
   const candidate = db
     .select({ id: jobs.id })
     .from(jobs)
     .where(and(eq(jobs.status, "pending"), lte(jobs.runAt, nowText), inArray(jobs.type, [...types])))
-    .orderBy(asc(jobs.runAt), asc(jobs.createdAt))
+    .orderBy(asc(priorityCase), asc(jobs.runAt), asc(jobs.createdAt))
     .limit(1)
     .get();
   if (!candidate) return null;
