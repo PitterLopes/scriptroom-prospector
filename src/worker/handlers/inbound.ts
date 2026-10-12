@@ -85,7 +85,12 @@ export const processInbound: JobHandler = async (job, ctx) => {
     }
 
     const stage = history.some((m) => m.direction === "outbound" && m.channel === "api") ? "ongoing" : "first_reply";
-    const decision = await ctx.engine().decide(current, history, classification.intent, stage);
+    let decision = await ctx.engine().decide(current, history, classification.intent, stage);
+    // The model once "closed" a lead who had just said she would test the app. Closing is for not_interested and
+    // opt_out only; an interested person who goes quiet gets a light follow-up instead.
+    if (decision.action === "close" && !["not_interested", "opt_out"].includes(classification.intent)) {
+      decision = { ...decision, action: "schedule_follow_up", followUpHours: decision.followUpHours || 48, reasoning: `${decision.reasoning} [close trocado por follow-up: intenção ${classification.intent}]` };
+    }
     recordLeadEvent(ctx.db, current.id, "ai_decision", "ai", { action: decision.action, reasoning: decision.reasoning, pipelineHint: decision.pipelineHint, hasReply: Boolean(decision.reply) });
 
     if (decision.pipelineHint === "interested" && current.pipelineState === "replied") current = movePipelineSafe(ctx, current, "interested", decision.reasoning);

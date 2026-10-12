@@ -189,6 +189,17 @@ describe("handoff browser → webhook → API", () => {
     expect(getLead(db, ana.id)!.pipelineState).toBe("replied");
   });
 
+  it("never closes a lead the model wanted to close while she is still interested: it becomes a follow-up", async () => {
+    const { ctx, db, ana } = await contacted({ ai: { classify: { intent: "interested", summary: "vai testar" }, decide: { action: "close", reply: "", reasoning: "encerro de leve", pipeline_hint: "interested" } } });
+    const result = await processInbound(job("process_inbound", { mid: "mid_close", senderId: "123", recipientId: "x", text: "Vou testar 🫶🏼", timestamp: new Date().toISOString(), attachments: 0 }), ctx);
+    expect(result).toMatchObject({ kind: "done", note: "intent interested → schedule_follow_up" });
+    const after = getLead(db, ana.id)!;
+    expect(after.pipelineState).toBe("interested");
+    expect(after.channelState).toBe("api_active");
+    expect(after.nextAction).toBe("Follow-up");
+    expect(after.nextActionAt).not.toBeNull();
+  });
+
   it("sends the reply through the Graph API exactly once and never through the browser", async () => {
     const { ctx, db, ana, browser } = await contacted();
     await processInbound(job("process_inbound", { mid: "mid_2", senderId: "123", recipientId: "x", text: "Como funciona?", timestamp: new Date().toISOString(), attachments: 0 }), ctx);
