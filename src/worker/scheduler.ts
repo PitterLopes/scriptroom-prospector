@@ -45,7 +45,9 @@ export function scheduleTick(ctx: WorkerContext): { scheduled: number } {
   const remaining = Math.max(allowanceToday(ctx, now) - sentToday(ctx, now), 0);
   if (remaining > 0) {
     for (const lead of nextLeadsToContact(ctx.db, "customers", remaining).filter((l) => !(JSON.parse(l.tags) as string[]).includes("dry_run"))) {
-      bump(enqueue(ctx.db, "send_first_dm", { leadId: lead.id }, { idempotencyKey: `first_dm:${lead.id}`, leadId: lead.id, maxAttempts: 3 }));
+      // The key carries the lead's last state change: a lead returned to the queue after a failure gets a new job;
+      // an untouched lead never gets two.
+      bump(enqueue(ctx.db, "send_first_dm", { leadId: lead.id }, { idempotencyKey: `first_dm:${lead.id}:${lead.updatedAt}`, leadId: lead.id, maxAttempts: 3 }));
     }
   }
   return { scheduled };
