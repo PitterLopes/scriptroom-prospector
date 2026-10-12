@@ -20,4 +20,5 @@ exec "$CHROME" \
   --remote-debugging-address=127.0.0.1 \
   --remote-debugging-port="$PORT" \
   --no-first-run --no-default-browser-check \
+  --window-size=1440,1000 \
   "https://www.instagram.com/"

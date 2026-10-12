@@ -12,4 +12,4 @@ $chrome = if ($env:CHROME_BIN) { $env:CHROME_BIN } else { $candidates | Where-Ob
 if (-not $chrome) { Write-Error "Chrome não encontrado. Defina CHROME_BIN."; exit 1 }
 Write-Host "Perfil dedicado: $profile"
 Write-Host "Porta de depuração: 127.0.0.1:$port (nunca 0.0.0.0)"
-& $chrome --user-data-dir="$profile" --remote-debugging-address=127.0.0.1 --remote-debugging-port=$port --no-first-run --no-default-browser-check "https://www.instagram.com/"
+& $chrome --user-data-dir="$profile" --remote-debugging-address=127.0.0.1 --remote-debugging-port=$port --window-size=1440,1000 --no-first-run --no-default-browser-check "https://www.instagram.com/"
