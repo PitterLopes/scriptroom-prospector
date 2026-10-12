@@ -215,3 +215,54 @@ da janela ele avisa em Exceções e você manda à mão, se quiser.
 
 **O que olhar todo dia no painel:** Exceções (janela fechada, revisão humana, falha de envio), a linha do tempo de
 quem respondeu, e o gasto de IA do mês (hoje: centavos).
+
+## 13. Segunda instância: outro produto, mesmo código (DropDesk, 12/10/2026)
+
+O sistema não sabe de produto nenhum: tudo o que é de um negócio mora em `config/business.json` (empresa, oferta,
+história de quem escreve, posicionamento, fatos verificados, público, hashtags, links por nicho e WhatsApp), no
+`.env` (chaves, token da Meta, conta, portas) e nas pastas ignoradas pelo git (`.chrome-profile/`, `data/`). Para
+prospectar para outro produto, **clona-se o mesmo repositório em outra pasta** e preenche-se essas três coisas.
+Correção de código vai para o repositório e chega às duas cópias com `git pull`; cada cópia reinicia o seu worker.
+
+**O que separa as instâncias na mesma máquina:**
+
+| | 1ª instância | 2ª instância |
+|---|---|---|
+| Pasta | `~/scriptroom-prospector` | `~/dropdesk/prospector` |
+| Chrome dedicado | porta 9222 | `CHROME_DEBUG_PORT=9223 scripts/chrome-debug.sh` (perfil próprio) |
+| Painel | 3100 | `PANEL_PORT=3101` no `.env` |
+| Caixa de entrada | Worker `scriptroom-prospector-inbox` | `npx wrangler deploy --name dropdesk-prospector-inbox` + segredos próprios |
+| App da Meta | Scriptroom | app próprio, no portfólio da empresa |
+| Chave OpenRouter | uma por produto, com limite próprio | idem |
+
+**Como a DropDesk foi montada (12/10/2026), para repetir com o próximo produto:**
+
+1. Clone, `npm install`, `.env` a partir do `.env.example` com as portas e a URL do Worker novo.
+2. Chrome dedicado na porta nova; a pessoa loga o Instagram do produto nele. **A janela tem de ter largura de
+   desktop**: com 744 px o Instagram serve o layout de celular e a caixa de mensagem não fica onde o worker procura
+   (o script passou a abrir com 1440 px).
+3. Worker da caixa de entrada publicado com outro nome; `VERIFY_TOKEN` e `RELAY_TOKEN` gerados; `APP_SECRET`
+   depois do app da Meta.
+4. No Meta for Developers: app novo (caso de uso Instagram) **no portfólio da empresa** (já com verificação de
+   empresa e de acesso); "Add all required permissions"; webhook com a URL do Worker e o verify token (a Meta
+   assina todos os campos; só `messages` importa); a conta do Instagram como **Testadora do Instagram** (o convite
+   se aceita no Instagram, em Configurações › Apps e sites, pelo Chrome dedicado); login da empresa com a URL de
+   redirecionamento `…workers.dev/oauth`; ficha do app (ícone 1024, política, termos, exclusão de dados, categoria)
+   e **Publicar**. Se a Meta disser "URL da política inválido", confira no Depurador de Compartilhamento: o site da
+   DropDesk (Wix) devolveu 429 ao rastreador; "Extrair novamente" resolveu.
+5. **O token sem senha nenhuma:** a URL de autorização (`instagram.com/oauth/authorize?client_id=<id do app
+   Instagram>&redirect_uri=…/oauth&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments`)
+   aberta no Chrome dedicado (já logado), "Permitir", o `code` lido da URL de volta, trocado em
+   `api.instagram.com/oauth/access_token` e depois em `graph.instagram.com/access_token?grant_type=ig_exchange_token`
+   (60 dias; renovar com `refresh_access_token` antes). `POST /me/subscribed_apps?subscribed_fields=messages`.
+   O id da conta para o `.env` é o `user_id` de `/me?fields=id,user_id,username`.
+6. Chave OpenRouter nova, `business.json` preenchido (a partir da landing page e do contrato), `npm run dev`,
+   simulação, e só então o envio real.
+
+**Estado da DropDesk em 12/10/2026, 16:35:** envio real ligado com **10 por dia** (`limits.override` e `.env`),
+follow antes da DM, abertura na voz de cofundador pedindo opinião, WhatsApp só para quem pede, landing page por
+nicho como caminho padrão. Primeira DM real para um escritório de contabilidade às 16:35, com resposta pela API
+da conta @dropdeskoficial. **Lições do primeiro dia:** o Instagram, para uma conta comercial escrevendo a um perfil
+verificado, abre "Enviar mensagem prioritária / Enviar solicitação de contato" — o worker escolhe a solicitação de
+contato, nunca a prioritária (produto pago de parceria); o texto base longo demais fazia a abertura passar de 480
+caracteres (encurtado); o painel passou a mostrar o nome da empresa da configuração.
