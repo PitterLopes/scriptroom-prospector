@@ -54,7 +54,7 @@ export const sendFirstDm: JobHandler = async (job, ctx) => {
   if (!lead) return done("lead no longer exists");
   if (lead.pipelineState !== "qualified" || lead.channelState !== "browser_contact_pending") return done(`not eligible (${lead.pipelineState}/${lead.channelState})`);
   if (isDoNotContact(ctx.db, lead.username)) return done("do not contact");
-  if ((JSON.parse(lead.tags) as string[]).includes("dry_run")) return done("already simulated");
+  if (!ctx.sendEnabled() && (JSON.parse(lead.tags) as string[]).includes("dry_run")) return done("already simulated");
   if (isSystemPaused(ctx.db)) return postpone(addSeconds(now, 10 * 60), "system paused");
   if (isBrowserPaused(ctx.db)) return postpone(addSeconds(now, 15 * 60), "browser queue paused");
 
