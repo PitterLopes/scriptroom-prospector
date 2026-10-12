@@ -20,6 +20,7 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     CHROME_PROFILE_DIR: "./.chrome-profile",
     BROWSER_SEND_ENABLED: false,
     FOLLOW_BEFORE_DM: true,
+    INBOUND_SETTLE_SECONDS: 0,
     INSTAGRAM_APP_SECRET: "secret",
     INSTAGRAM_PAGE_ACCESS_TOKEN: "token",
     INSTAGRAM_WEBHOOK_VERIFY_TOKEN: "verify",

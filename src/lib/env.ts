@@ -19,6 +19,8 @@ const envSchema = z.object({
   BROWSER_SEND_ENABLED: boolFromString.default(false),
   /** Follow the person right before the first DM (real sends only; never in dry-run). */
   FOLLOW_BEFORE_DM: boolFromString.default(true),
+  /** People answer in bursts of short messages; wait this long after the last one before replying once to all of them. */
+  INBOUND_SETTLE_SECONDS: z.coerce.number().int().min(0).max(600).default(45),
 
   INSTAGRAM_APP_SECRET: z.string().optional(),
   INSTAGRAM_PAGE_ACCESS_TOKEN: z.string().optional(),

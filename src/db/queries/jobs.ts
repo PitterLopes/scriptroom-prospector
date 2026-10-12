@@ -167,3 +167,17 @@ export function retryDeadJob(db: Db, id: string): void {
 export function parsePayload<T>(job: Job): T {
   return JSON.parse(job.payload) as T;
 }
+
+export function jobByIdempotencyKey(db: Db, key: string): Job | null {
+  return db.select().from(jobs).where(eq(jobs.idempotencyKey, key)).get() ?? null;
+}
+
+/** The `process_inbound` jobs still waiting for one sender: how the handler sees the rest of a burst before it is stored. */
+export function pendingInboundJobsForSender(db: Db, senderId: string): Array<{ mid: string; timestamp: string }> {
+  const rows = db
+    .select({ payload: jobs.payload })
+    .from(jobs)
+    .where(and(eq(jobs.type, "process_inbound"), inArray(jobs.status, ["pending", "running"]), sql`${jobs.payload} like ${`%"senderId":"${senderId}"%`}`))
+    .all();
+  return rows.map((r) => JSON.parse(r.payload) as { mid: string; timestamp: string });
+}

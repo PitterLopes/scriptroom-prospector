@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SAMPLE_PROFILES, buildContext } from "./helpers";
-import { claimNext, enqueue, listJobs } from "@/db/queries/jobs";
+import { claimNext, completeJob, enqueue, listJobs, postponeJob } from "@/db/queries/jobs";
 import { getLead, getLeadByUsername, getOrCreateConversation, isDoNotContact, listMessages, upsertDiscoveredLead } from "@/db/queries/leads";
 import { getPause, setSetting } from "@/db/queries/settings";
 import { listOpenExceptions } from "@/db/queries/events";
@@ -126,8 +126,8 @@ describe("discovery → scoring → first DM", () => {
 });
 
 describe("handoff browser → webhook → API", () => {
-  async function contacted() {
-    const built = buildContext({ env: { BROWSER_SEND_ENABLED: true } });
+  async function contacted(options: Parameters<typeof buildContext>[0] = {}) {
+    const built = buildContext({ ...options, env: { BROWSER_SEND_ENABLED: true, ...options.env } });
     setSetting(built.db, "browser.sendEnabled", true);
     const ana = await discoverAndQualify(built.ctx, built.db);
     await sendFirstDm(job("send_first_dm", { leadId: ana.id }), built.ctx);
@@ -149,6 +149,44 @@ describe("handoff browser → webhook → API", () => {
     const dup = await processInbound(job("process_inbound", inbound), ctx);
     expect(dup).toMatchObject({ kind: "done", note: "duplicate webhook event" });
     expect(listJobs(db).filter((j) => j.type === "send_api_reply")).toHaveLength(1);
+  });
+
+  it("a burst of short replies waits to settle and gets one answer, with the whole burst in front of the model", async () => {
+    let clock = new Date();
+    const aiCalls: Array<{ purpose: string; body: Record<string, unknown> }> = [];
+    const { ctx, db, ana } = await contacted({ env: { INBOUND_SETTLE_SECONDS: 45 }, now: () => clock, aiCalls });
+    const at = (seconds: number) => new Date(clock.getTime() + seconds * 1000).toISOString();
+    const burst = [
+      { mid: "b1", senderId: "123", recipientId: "x", text: "Olá boa tarde", timestamp: at(7), attachments: 0 },
+      { mid: "b2", senderId: "123", recipientId: "x", text: "Posso testar sim", timestamp: at(13), attachments: 0 },
+      { mid: "b3", senderId: "123", recipientId: "x", text: "Obrigada", timestamp: at(18), attachments: 0 },
+    ];
+    for (const m of burst) enqueue(db, "process_inbound", m, { idempotencyKey: `inbound:${m.mid}` });
+    const runNext = async () => {
+      const next = claimNext(db, "test", ["process_inbound"], clock)!;
+      expect(next).not.toBeNull();
+      const result = await processInbound(next, ctx);
+      if (result.kind === "postpone") postponeJob(db, next.id, result.runAt, result.note);
+      else completeJob(db, next.id);
+      return result;
+    };
+    // Twenty seconds in, the whole burst is stored but nothing is answered yet.
+    clock = new Date(clock.getTime() + 20_000);
+    for (let i = 0; i < 3; i += 1) expect((await runNext()).kind).toBe("postpone");
+    expect(listMessages(db, ana.id).filter((m) => m.direction === "inbound")).toHaveLength(3);
+    expect(listJobs(db).filter((j) => j.type === "send_api_reply")).toHaveLength(0);
+    // Once settled, the older messages step aside and the newest answers for all three.
+    clock = new Date(clock.getTime() + 60_000);
+    expect(await runNext()).toMatchObject({ kind: "done", note: expect.stringContaining("superseded") });
+    expect(await runNext()).toMatchObject({ kind: "done", note: expect.stringContaining("superseded") });
+    expect(await runNext()).toMatchObject({ kind: "done", note: expect.stringContaining("intent") });
+    const replies = listJobs(db).filter((j) => j.type === "send_api_reply");
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.idempotencyKey).toBe("reply:b3");
+    const classifyCall = aiCalls.find((c) => c.purpose === "classify")!;
+    const seen = JSON.stringify(classifyCall.body);
+    for (const m of burst) expect(seen).toContain(m.text);
+    expect(getLead(db, ana.id)!.pipelineState).toBe("replied");
   });
 
   it("sends the reply through the Graph API exactly once and never through the browser", async () => {

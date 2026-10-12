@@ -26,6 +26,8 @@ export const HANDLERS: Record<JobType, JobHandler> = {
 
 const ALL_TYPES = Object.keys(HANDLERS) as JobType[];
 
+const RELAY_PULL_INTERVAL_MS = 30_000;
+
 /** One pass: recover, schedule, then run due jobs until the queue is empty or `maxJobs` is reached. */
 export async function runOnce(ctx: WorkerContext, maxJobs = 20): Promise<{ ran: number; scheduled: number }> {
   recoverStaleJobs(ctx.db, ctx.now());
@@ -34,9 +36,15 @@ export async function runOnce(ctx: WorkerContext, maxJobs = 20): Promise<{ ran: 
   }
   const { scheduled } = scheduleTick(ctx);
   let ran = 0;
+  let lastPull = Date.now();
   while (ran < maxJobs) {
     // Re-plan every few jobs so a freshly qualified lead gets its DM scheduled without waiting for the whole pass.
     if (ran > 0 && ran % 3 === 0) scheduleTick(ctx);
+    // A browser job can take minutes; a reply that arrived meanwhile should not wait for the whole pass.
+    if (ctx.env.RELAY_URL && ctx.env.RELAY_TOKEN && Date.now() - lastPull > RELAY_PULL_INTERVAL_MS) {
+      await pullRelaySafely(ctx.db, { url: ctx.env.RELAY_URL, token: ctx.env.RELAY_TOKEN, ownAccountId: ctx.env.INSTAGRAM_BUSINESS_ACCOUNT_ID });
+      lastPull = Date.now();
+    }
     const job = claimNext(ctx.db, ctx.workerId, ALL_TYPES, ctx.now());
     if (!job) break;
     ran += 1;

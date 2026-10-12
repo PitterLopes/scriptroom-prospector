@@ -1,9 +1,9 @@
-import { enqueue, parsePayload } from "@/db/queries/jobs";
-import { getLead, getLeadByIgUserId, getLeadByUsername, getOrCreateConversation, insertMessage, linkIgUserId, listMessages, markDoNotContact, moveChannel, movePipeline, updateConversation, updateLeadFields } from "@/db/queries/leads";
+import { enqueue, jobByIdempotencyKey, parsePayload, pendingInboundJobsForSender } from "@/db/queries/jobs";
+import { getLead, getLeadByIgUserId, getLeadByUsername, getMessageByExternalId, getOrCreateConversation, insertMessage, linkIgUserId, listMessages, markDoNotContact, moveChannel, movePipeline, updateConversation, updateLeadFields } from "@/db/queries/leads";
 import { audit, raiseException, recordLeadEvent } from "@/db/queries/events";
 import { apiWindowExpiry } from "@/integrations/instagram/graph";
 import { BudgetExceededError } from "@/integrations/openrouter/client";
-import type { Lead } from "@/db/schema";
+import type { Lead, Message } from "@/db/schema";
 import type { Funnel, PipelineState } from "@/features/leads/states";
 import { canMovePipeline } from "@/features/leads/states";
 import { addSeconds } from "@/lib/time";
@@ -29,36 +29,53 @@ export const processInbound: JobHandler = async (job, ctx) => {
   if (lead.channelState === "do_not_contact" || lead.channelState === "blocked") return done(`lead is ${lead.channelState}`);
 
   const text = payload.text?.trim() || (payload.attachments > 0 ? "[anexo sem texto]" : "");
-  const inserted = insertMessage(ctx.db, { leadId: lead.id, direction: "inbound", channel: "api", text, status: "received", externalId: payload.mid, sentAt: payload.timestamp });
-  if (!inserted) return done("duplicate webhook event");
-
-  const conversation = getOrCreateConversation(ctx.db, lead.id);
-  updateConversation(ctx.db, conversation.id, { apiWindowExpiresAt: apiWindowExpiry(payload.timestamp), lastInboundAt: payload.timestamp });
-
   let current = lead;
-  if (["browser_contact_pending", "browser_contact_sent", "waiting_inbound_reply"].includes(current.channelState)) {
-    if (current.channelState !== "waiting_inbound_reply") current = moveChannel(ctx.db, current, current.channelState === "browser_contact_pending" ? "browser_contact_sent" : "waiting_inbound_reply", "webhook", "reply arrived");
-    if (current.channelState === "browser_contact_sent") current = moveChannel(ctx.db, current, "waiting_inbound_reply", "webhook");
-    current = moveChannel(ctx.db, current, "api_eligible", "webhook", "handoff: browser → API");
-    current = moveChannel(ctx.db, current, "api_active", "webhook");
-    recordLeadEvent(ctx.db, current.id, "channel_handoff", "webhook", { from: "browser", to: "api", mid: payload.mid });
-  } else if (current.channelState === "api_window_closed" || current.channelState === "api_eligible") {
-    current = moveChannel(ctx.db, current, "api_active", "webhook", "new inbound reopened the window");
-  }
-  if (current.pipelineState === "contacted" || current.pipelineState === "qualified") {
-    current = movePipelineSafe(ctx, current, "replied", "lead replied");
-  }
-  if (current.channelState === "human_review_required") {
-    raiseException(ctx.db, "human_review", `@${current.username} respondeu enquanto estava em revisão humana`, { leadId: current.id, payload: { text } });
+  const stored = getMessageByExternalId(ctx.db, payload.mid);
+  if (stored && jobByIdempotencyKey(ctx.db, `reply:${payload.mid}`)) return done("duplicate webhook event");
+  if (!stored) {
+    const inserted = insertMessage(ctx.db, { leadId: lead.id, direction: "inbound", channel: "api", text, status: "received", externalId: payload.mid, sentAt: payload.timestamp });
+    if (!inserted) return done("duplicate webhook event");
+
+    const conversation = getOrCreateConversation(ctx.db, lead.id);
+    updateConversation(ctx.db, conversation.id, { apiWindowExpiresAt: apiWindowExpiry(payload.timestamp), lastInboundAt: payload.timestamp });
+
+    if (["browser_contact_pending", "browser_contact_sent", "waiting_inbound_reply"].includes(current.channelState)) {
+      if (current.channelState !== "waiting_inbound_reply") current = moveChannel(ctx.db, current, current.channelState === "browser_contact_pending" ? "browser_contact_sent" : "waiting_inbound_reply", "webhook", "reply arrived");
+      if (current.channelState === "browser_contact_sent") current = moveChannel(ctx.db, current, "waiting_inbound_reply", "webhook");
+      current = moveChannel(ctx.db, current, "api_eligible", "webhook", "handoff: browser → API");
+      current = moveChannel(ctx.db, current, "api_active", "webhook");
+      recordLeadEvent(ctx.db, current.id, "channel_handoff", "webhook", { from: "browser", to: "api", mid: payload.mid });
+    } else if (current.channelState === "api_window_closed" || current.channelState === "api_eligible") {
+      current = moveChannel(ctx.db, current, "api_active", "webhook", "new inbound reopened the window");
+    }
+    if (current.pipelineState === "contacted" || current.pipelineState === "qualified") {
+      current = movePipelineSafe(ctx, current, "replied", "lead replied");
+    }
+    if (current.channelState === "human_review_required") {
+      raiseException(ctx.db, "human_review", `@${current.username} respondeu enquanto estava em revisão humana`, { leadId: current.id, payload: { text } });
+      return done("in human review; stored only");
+    }
+  } else if (current.channelState === "human_review_required") {
     return done("in human review; stored only");
   }
   if (!text) return done("inbound without text stored");
   if (isSystemPaused(ctx.db)) return postpone(addSeconds(now, 10 * 60), "system paused");
 
+  // People answer in bursts of short messages ("Olá", "Posso testar sim", "Obrigada"). Let the burst settle, then let only
+  // its newest message answer, with the whole burst in front of the model: three messages in, one reply out.
+  const settle = ctx.env.INBOUND_SETTLE_SECONDS;
+  const arrived = new Date(payload.timestamp);
+  if (settle > 0 && now.getTime() - arrived.getTime() < settle * 1000) return postpone(addSeconds(arrived, settle), "waiting for the burst of messages to settle");
+  if (newerInboundExists(ctx, current, payload)) return done("superseded by a newer message from the same person; answered there");
+
   const history = listMessages(ctx.db, current.id).filter((m) => m.status !== "dry_run" && m.status !== "failed" && m.status !== "planned");
+  const unanswered = unansweredInbound(history);
+  if (unanswered.length === 0) return done("already answered");
+  const inboundText = unanswered.map((m) => m.text).filter((t) => t.length > 0).join("\n");
+  const answered = history.slice(0, history.length - unanswered.length);
   try {
-    const classification = await ctx.engine().classify(current, text, history.slice(0, -1));
-    updateConversation(ctx.db, conversation.id, { lastIntent: classification.intent, summary: classification.summary });
+    const classification = await ctx.engine().classify(current, inboundText, answered);
+    updateConversation(ctx.db, getOrCreateConversation(ctx.db, current.id).id, { lastIntent: classification.intent, summary: classification.summary });
     recordLeadEvent(ctx.db, current.id, "intent_classified", "ai", { ...classification, mid: payload.mid });
 
     if (classification.intent === "opt_out") {
@@ -67,7 +84,7 @@ export const processInbound: JobHandler = async (job, ctx) => {
       return done("opt-out honored");
     }
 
-    const stage = history.filter((m) => m.direction === "inbound").length <= 1 ? "first_reply" : "ongoing";
+    const stage = history.some((m) => m.direction === "outbound" && m.channel === "api") ? "ongoing" : "first_reply";
     const decision = await ctx.engine().decide(current, history, classification.intent, stage);
     recordLeadEvent(ctx.db, current.id, "ai_decision", "ai", { action: decision.action, reasoning: decision.reasoning, pipelineHint: decision.pipelineHint, hasReply: Boolean(decision.reply) });
 
@@ -75,7 +92,7 @@ export const processInbound: JobHandler = async (job, ctx) => {
     if (decision.action === "escalate_to_human") {
       moveChannel(ctx.db, current, "human_review_required", "ai", decision.reasoning);
       updateLeadFields(ctx.db, current.id, { nextAction: "Responder manualmente", nextActionAt: now.toISOString() });
-      raiseException(ctx.db, "human_review", `@${current.username} precisa de resposta humana: ${decision.reasoning}`, { leadId: current.id, payload: { text, violations: decision.guardViolations } });
+      raiseException(ctx.db, "human_review", `@${current.username} precisa de resposta humana: ${decision.reasoning}`, { leadId: current.id, payload: { text: inboundText, violations: decision.guardViolations } });
       return done("escalated to human");
     }
     if (decision.reply) {
@@ -115,4 +132,21 @@ async function matchLead(ctx: WorkerContext, payload: InboundPayload): Promise<L
 
 function movePipelineSafe(ctx: WorkerContext, lead: Lead, to: PipelineState, reason: string): Lead {
   return canMovePipeline(lead.funnel as Funnel, lead.pipelineState as PipelineState, to) ? movePipeline(ctx.db, lead, to, "ai", reason) : lead;
+}
+
+/** The inbound messages that came after our last outbound: the burst this reply has to answer as a whole. */
+function unansweredInbound(history: Message[]): Message[] {
+  let lastOutbound = -1;
+  history.forEach((m, i) => {
+    if (m.direction === "outbound") lastOutbound = i;
+  });
+  return history.slice(lastOutbound + 1).filter((m) => m.direction === "inbound");
+}
+
+/** A newer message from the same person, stored or still queued, will carry the reply: this one steps aside. */
+function newerInboundExists(ctx: WorkerContext, lead: Lead, payload: InboundPayload): boolean {
+  const at = new Date(payload.timestamp).getTime();
+  const storedNewer = listMessages(ctx.db, lead.id).some((m) => m.direction === "inbound" && m.externalId !== payload.mid && m.sentAt !== null && new Date(m.sentAt).getTime() > at);
+  if (storedNewer) return true;
+  return pendingInboundJobsForSender(ctx.db, payload.senderId).some((p) => p.mid !== payload.mid && new Date(p.timestamp).getTime() > at);
 }

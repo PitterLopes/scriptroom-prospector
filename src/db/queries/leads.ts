@@ -230,6 +230,10 @@ export function updateMessage(db: Db, id: string, fields: Partial<Pick<Message, 
   db.update(messages).set(fields).where(eq(messages.id, id)).run();
 }
 
+export function getMessageByExternalId(db: Db, externalId: string): Message | null {
+  return db.select().from(messages).where(eq(messages.externalId, externalId)).get() ?? null;
+}
+
 export function listMessages(db: Db, leadId: string): Message[] {
   return db.select().from(messages).where(eq(messages.leadId, leadId)).orderBy(asc(messages.createdAt)).all();
 }
