@@ -10,7 +10,7 @@ const config = [
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
-  { ignores: [".next/**", "node_modules/**", "drizzle/**", "data/**", "next-env.d.ts"] },
+  { ignores: [".next/**", "node_modules/**", "drizzle/**", "data/**", "next-env.d.ts", "relay/**"] },
 ];
 
 export default config;

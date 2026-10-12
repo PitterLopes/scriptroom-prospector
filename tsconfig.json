@@ -39,8 +39,9 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
     ".next",
-    "drizzle"
+    "drizzle",
+    "node_modules",
+    "relay"
   ]
 }

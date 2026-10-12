@@ -42,7 +42,7 @@ export function createContext(overrides: ContextOverrides = {}): WorkerContext {
   let ai: OpenRouterClient | null = overrides.ai ?? null;
   let engine: ConversationEngine | null = null;
   let browser: InstagramBrowser | null = overrides.browser ?? null;
-  const graph = overrides.graph !== undefined ? overrides.graph : instagramApiConfigured(e) ? new InstagramGraphClient({ accessToken: e.INSTAGRAM_PAGE_ACCESS_TOKEN!, graphVersion: e.META_GRAPH_VERSION }) : null;
+  const graph = overrides.graph !== undefined ? overrides.graph : instagramApiConfigured(e) ? new InstagramGraphClient({ accessToken: e.INSTAGRAM_PAGE_ACCESS_TOKEN!, graphVersion: e.META_GRAPH_VERSION, baseUrl: e.META_GRAPH_BASE }) : null;
   const ctx: WorkerContext = {
     db,
     config,

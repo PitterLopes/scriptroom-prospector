@@ -1,0 +1,19 @@
+name = "scriptroom-prospector-inbox"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Secrets (set with `npx wrangler secret put <NAME>` inside relay/):
+#   APP_SECRET   — the Instagram app secret from Meta for Developers (signs every webhook body)
+#   VERIFY_TOKEN — the string typed in Meta's "Verify token" field
+#   RELAY_TOKEN  — what the local worker sends as `Authorization: Bearer …` to read events
+
+[[durable_objects.bindings]]
+name = "INBOX"
+class_name = "Inbox"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Inbox"]
+
+[observability]
+enabled = true

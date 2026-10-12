@@ -72,20 +72,22 @@ roda; pode minimizar. O sistema abre a própria aba, digita e fecha a aba; nunca
 Esta parte é opcional para testar o resto, mas sem ela toda resposta de lead vai para "Precisa de você" no painel,
 e você responde à mão. Com ela, a IA responde sozinha dentro das regras.
 
-1. Em https://developers.facebook.com, no app **Scriptroom** (o mesmo da medição de anúncios), adicione o produto
-   **Instagram** › **Messenger API for Instagram** (ou "Instagram Messaging").
-2. Conecte a Página do Facebook ligada à `@lopespitter` e gere um **token de acesso da Página** com as permissões
-   `instagram_basic`, `instagram_manage_messages`, `pages_manage_metadata`, `pages_messaging`.
-3. Copie para o `.env`: `INSTAGRAM_APP_SECRET` (Configurações › Básico), `INSTAGRAM_PAGE_ACCESS_TOKEN`,
-   `INSTAGRAM_BUSINESS_ACCOUNT_ID` (o ID da conta Instagram profissional).
-4. Invente um `INSTAGRAM_WEBHOOK_VERIFY_TOKEN` longo (qualquer texto) e cole no `.env`.
-5. O webhook precisa de um endereço público HTTPS apontando para a sua máquina. Com o sistema rodando:
-   ```bash
-   npx cloudflared tunnel --url http://localhost:3100
-   ```
-   (ou `ngrok http 3100`). Copie o endereço gerado e cadastre em Webhooks › Instagram:
-   URL `https://<seu-endereco>/api/webhooks/instagram`, token de verificação igual ao do `.env`, e assine o campo
-   **messages**.
+1. **Feito em 12/10/2026:** no app **Scriptroom** do Meta for Developers entrou o caso de uso "Gerenciar mensagens
+   e conteúdo no Instagram" (API com login do Instagram, app do Instagram `Scriptroom-IG`), com as permissões
+   `instagram_business_basic`, `instagram_business_manage_comments` e `instagram_business_manage_messages`.
+2. **Falta você:** em Casos de uso › Personalizar › "2. Gerar tokens de acesso" › **Adicionar conta**, entre com a
+   `@lopespitter` na janela que abre e autorize. Aí aparece o botão de gerar o token.
+3. Copie o token gerado para `INSTAGRAM_PAGE_ACCESS_TOKEN` no `.env` e o ID da conta para
+   `INSTAGRAM_BUSINESS_ACCOUNT_ID`. O `INSTAGRAM_APP_SECRET` (segredo do app do Instagram) já está no `.env`.
+4. O `INSTAGRAM_WEBHOOK_VERIFY_TOKEN` já está no `.env` e cadastrado na Meta.
+5. **O webhook já está configurado** (feito em 12/10/2026): a Meta entrega as mensagens numa caixa de entrada
+   na sua Cloudflare, o Worker `scriptroom-prospector-inbox` (pasta `relay/`), em
+   `https://scriptroom-prospector-inbox.pitterdebarros.workers.dev/webhook`, assinado com o segredo do app do
+   Instagram. O sistema no Mac busca os eventos de lá a cada poucos segundos (`RELAY_URL` e `RELAY_TOKEN` no
+   `.env`). Funciona mesmo com o Mac desligado: os eventos esperam até 14 dias. Para republicar o Worker depois
+   de uma mudança: `cd relay && npx wrangler deploy`. Os segredos dele (`APP_SECRET`, `VERIFY_TOKEN`,
+   `RELAY_TOKEN`) ficam na Cloudflare; para trocar, `npx wrangler secret put <NOME>` dentro de `relay/`.
+   Se um dia preferir um túnel direto para o Mac, a rota local `/api/webhooks/instagram` continua existindo.
 6. Em modo de desenvolvimento, o app só recebe mensagens de contas com papel no app (você). Para receber de qualquer
    pessoa, o app precisa do **App Review** da Meta para `instagram_manage_messages`. Enquanto isso, teste com uma
    segunda conta sua adicionada como testadora.

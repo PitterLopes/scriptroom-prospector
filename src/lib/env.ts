@@ -22,7 +22,13 @@ const envSchema = z.object({
   INSTAGRAM_PAGE_ACCESS_TOKEN: z.string().optional(),
   INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
   INSTAGRAM_BUSINESS_ACCOUNT_ID: z.string().optional(),
-  META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v24.0"),
+  META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
+  /** graph.instagram.com for tokens from "Instagram Login"; graph.facebook.com for Page tokens from Facebook Login. */
+  META_GRAPH_BASE: z.string().url().default("https://graph.instagram.com"),
+
+  /** Cloudflare inbox Worker (relay/): stable public webhook URL; the worker pulls events from it. */
+  RELAY_URL: z.string().url().optional(),
+  RELAY_TOKEN: z.string().optional(),
 
   DATABASE_URL: z.string().default("./data/prospector.db"),
   BACKUP_DIR: z.string().default("./backups"),

@@ -75,6 +75,7 @@ export const EXCEPTION_LABELS: Record<string, string> = {
   api_unauthorized: "Token da Meta recusado",
   channel_ownership: "Canal errado para enviar",
   budget_exceeded: "Orçamento de IA atingido",
+  relay_unreachable: "Caixa de entrada na Cloudflare indisponível",
 };
 
 export const MESSAGE_STATUS_LABELS: Record<string, string> = {

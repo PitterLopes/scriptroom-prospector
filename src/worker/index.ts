@@ -3,6 +3,7 @@ import { claimNext, completeJob, failJob, postponeJob, recoverStaleJobs, type Jo
 import { audit } from "@/db/queries/events";
 import { createContext, type WorkerContext } from "./context";
 import { scheduleTick } from "./scheduler";
+import { pullRelaySafely } from "@/integrations/instagram/relay";
 import { discoverProfiles } from "./handlers/discover";
 import { enrichAndScore } from "./handlers/enrich";
 import { sendFirstDm } from "./handlers/first-dm";
@@ -28,6 +29,9 @@ const ALL_TYPES = Object.keys(HANDLERS) as JobType[];
 /** One pass: recover, schedule, then run due jobs until the queue is empty or `maxJobs` is reached. */
 export async function runOnce(ctx: WorkerContext, maxJobs = 20): Promise<{ ran: number; scheduled: number }> {
   recoverStaleJobs(ctx.db, ctx.now());
+  if (ctx.env.RELAY_URL && ctx.env.RELAY_TOKEN) {
+    await pullRelaySafely(ctx.db, { url: ctx.env.RELAY_URL, token: ctx.env.RELAY_TOKEN, ownAccountId: ctx.env.INSTAGRAM_BUSINESS_ACCOUNT_ID });
+  }
   const { scheduled } = scheduleTick(ctx);
   let ran = 0;
   while (ran < maxJobs) {

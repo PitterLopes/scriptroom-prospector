@@ -41,6 +41,14 @@ describe("webhook parsing", () => {
     expect(messages[1]!.isEcho).toBe(true);
     expect(parseInboundMessages({ object: "whatsapp" })).toEqual([]);
   });
+  it("reads the Instagram Login delivery shape (changes[].value) with a seconds timestamp", () => {
+    const sample = { object: "instagram", entry: [{ id: "0", time: 1791816516, changes: [{ field: "messages", value: { sender: { id: "12334" }, recipient: { id: "23245" }, timestamp: "1527459824", message: { mid: "random_mid", text: "random_text" } } }] }] };
+    const messages = parseInboundMessages(sample);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ mid: "random_mid", senderId: "12334", text: "random_text", timestamp: "2018-05-27T22:23:44.000Z" });
+    const other = { object: "instagram", entry: [{ changes: [{ field: "comments", value: { id: "c1" } }] }] };
+    expect(parseInboundMessages(other)).toEqual([]);
+  });
 });
 
 describe("messaging window", () => {

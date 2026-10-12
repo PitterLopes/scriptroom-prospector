@@ -24,6 +24,7 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     INSTAGRAM_WEBHOOK_VERIFY_TOKEN: "verify",
     INSTAGRAM_BUSINESS_ACCOUNT_ID: "17841400000000000",
     META_GRAPH_VERSION: "v24.0",
+    META_GRAPH_BASE: "https://graph.instagram.com",
     DATABASE_URL: ":memory:",
     BACKUP_DIR: "./backups",
     MAX_DMS_PER_DAY: 30,

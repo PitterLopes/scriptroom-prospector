@@ -1,0 +1,13 @@
+import { loadDotenv } from "@/lib/dotenv";
+import { openDatabase } from "@/db/client";
+import { env } from "@/lib/env";
+import { pullRelayEvents } from "@/integrations/instagram/relay";
+import { listJobs } from "@/db/queries/jobs";
+import { listAudit } from "@/db/queries/events";
+loadDotenv();
+const { db } = openDatabase("./data/smoke-relay.db");
+const e = env();
+const result = await pullRelayEvents(db, { url: e.RELAY_URL!, token: e.RELAY_TOKEN!, ownAccountId: e.INSTAGRAM_BUSINESS_ACCOUNT_ID });
+console.log("pull:", result);
+console.log("jobs:", listJobs(db).map((j) => `${j.type}:${j.status}`));
+console.log("audit:", listAudit(db).map((a) => `${a.action} ${a.details}`));
