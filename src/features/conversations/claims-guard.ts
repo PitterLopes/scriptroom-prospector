@@ -52,7 +52,7 @@ export function checkClaims(text: string, config: BusinessConfig): GuardResult {
   }
   if (text.length > 900) violations.push("too_long");
   if (/https?:\/\//i.test(text)) {
-    const allowedLinks = [config.company.website, config.links.appStore, config.links.whatsapp, config.links.affiliateGroup].filter((l): l is string => Boolean(l));
+    const allowedLinks = [config.company.website, config.links.appStore, config.links.whatsapp, config.links.affiliateGroup, ...Object.values(config.links.byNiche)].filter((l): l is string => Boolean(l));
     for (const match of text.matchAll(/https?:\/\/\S+/gi)) {
       const url = match[0].replace(/[).,]+$/, "");
       if (!allowedLinks.some((l) => url.startsWith(l))) violations.push(`link_not_allowed:${url}`);

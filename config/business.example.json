@@ -11,7 +11,10 @@
   "links": {
     "appStore": "{{link da App Store}}",
     "whatsapp": null,
-    "affiliateGroup": null
+    "affiliateGroup": null,
+    "byNiche": {
+      "{{nicho, como a pessoa se descreve}}": "{{link da página desse nicho}}"
+    }
   },
   "offer": {
     "oneLinePitch": "{{o que a empresa resolve, em uma frase}}",

@@ -13,6 +13,8 @@ const businessSchema = z.object({
     appStore: z.string().url().nullable(),
     whatsapp: z.string().url().nullable(),
     affiliateGroup: z.string().url().nullable(),
+    /** Landing page per niche ("escritório de contabilidade" → url): sent instead of the general link when the person is clearly from that niche. */
+    byNiche: z.record(z.string(), z.string().url()).default({}),
   }),
   offer: z.object({
     oneLinePitch: z.string().min(10),
