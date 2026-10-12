@@ -193,6 +193,9 @@ describe("handoff browser → webhook → API", () => {
     const { ctx, db, ana } = await contacted({ ai: { classify: { intent: "interested", summary: "vai testar" }, decide: { action: "close", reply: "", reasoning: "encerro de leve", pipeline_hint: "interested" } } });
     const result = await processInbound(job("process_inbound", { mid: "mid_close", senderId: "123", recipientId: "x", text: "Vou testar 🫶🏼", timestamp: new Date().toISOString(), attachments: 0 }), ctx);
     expect(result).toMatchObject({ kind: "done", note: "intent interested → schedule_follow_up" });
+    const thanks = listJobs(db).filter((j) => j.type === "send_api_reply");
+    expect(thanks).toHaveLength(1);
+    expect(JSON.parse(thanks[0]!.payload).text).toContain("obrigado");
     const after = getLead(db, ana.id)!;
     expect(after.pipelineState).toBe("interested");
     expect(after.channelState).toBe("api_active");

@@ -11,6 +11,9 @@ import type { WorkerContext } from "../context";
 import { isSystemPaused, noteOptOut } from "../safety";
 import { done, postpone, type JobHandler } from "./types";
 
+/** Honest, claim-free, and the same door the opening message opened: feedback either way helps. */
+const THANKS_FALLBACK = "Combinado, obrigado de verdade! Qualquer coisa que travar, ou se não fizer sentido pra você, me conta aqui — isso já me ajuda.";
+
 export type InboundPayload = { mid: string; senderId: string; recipientId: string; text: string | null; timestamp: string; attachments: number };
 
 /**
@@ -90,6 +93,11 @@ export const processInbound: JobHandler = async (job, ctx) => {
     // opt_out only; an interested person who goes quiet gets a light follow-up instead.
     if (decision.action === "close" && !["not_interested", "opt_out"].includes(classification.intent)) {
       decision = { ...decision, action: "schedule_follow_up", followUpHours: decision.followUpHours || 48, reasoning: `${decision.reasoning} [close trocado por follow-up: intenção ${classification.intent}]` };
+    }
+    // A person who says she will test and hears nothing back reads it as indifference. If the model left the reply
+    // empty on a follow-up, a one-line thank-you goes out anyway.
+    if (decision.action === "schedule_follow_up" && !decision.reply?.trim()) {
+      decision = { ...decision, reply: THANKS_FALLBACK };
     }
     recordLeadEvent(ctx.db, current.id, "ai_decision", "ai", { action: decision.action, reasoning: decision.reasoning, pipelineHint: decision.pipelineHint, hasReply: Boolean(decision.reply) });
 
