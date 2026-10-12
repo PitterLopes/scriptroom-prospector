@@ -7,9 +7,9 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "dev": "concurrently -n panel,worker -c blue,green \"next dev --port 3100\" \"npm run worker\"",
+    "dev": "concurrently -n panel,worker -c blue,green \"npm run panel\" \"npm run worker\"",
     "start": "concurrently -n panel,worker -c blue,green \"next start --port 3100\" \"npm run worker\"",
-    "panel": "next dev --port 3100",
+    "panel": "node scripts/panel.mjs",
     "worker": "tsx src/worker/index.ts",
     "worker:once": "tsx src/worker/index.ts --once",
     "build": "next build",
