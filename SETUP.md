@@ -123,7 +123,9 @@ Para rodar sem o painel: `npm run worker`. Para rodar uma passada só: `npm run 
   deixa claro que um "não faz sentido para mim" também ajuda. Sem link, sem preço, sem promessa. O texto base está em
   `config/business.json › offer.founderStory`.
 - **Três variantes no experimento** (pedido completo, curta, de colega), medidas pela taxa de resposta.
-- **Ritmo:** 15 mensagens por dia no máximo, começando com 5 e subindo 5 por semana.
+- **Ritmo:** 5 mensagens por dia, fixas (decisão de 12/10/2026 à noite: "mantemos as 5; depois subimos"). O teto
+  mora em dois lugares: no painel (`limits.override`, lido a cada envio) e no `.env` (`MAX_DMS_PER_DAY=5`,
+  `WARMUP_STEP_PER_WEEK=0`). Para subir, mude os dois.
 
 ## 7. Testar, na ordem certa
 
@@ -134,7 +136,7 @@ Para rodar sem o painel: `npm run worker`. Para rodar uma passada só: `npm run 
    perfil, pontua, escreve a mensagem com a IA, **digita no campo e apaga sem enviar**. Você vê a mensagem na
    linha do tempo do lead, marcada "Simulada (não enviada)".
 3. **Piloto real, só quando você autorizar:** no `.env`, `BROWSER_SEND_ENABLED=true`, reinicie, e na faixa do topo
-   clique **"Ligar envio real"**. Começa com 5 mensagens por dia (aquecimento) e sobe 5 por semana até 15.
+   clique **"Ligar envio real"**. Ligado em 12/10/2026 às 14:12 (ver a seção 12).
 
 Nada é enviado de verdade sem os dois passos do item 3.
 
@@ -172,3 +174,42 @@ contatar) · Configurações.
 
 Marque "Cadastrado" e "Cliente ativo" à mão no lead quando souber: a App Store não diz quem instalou a partir de
 uma DM, e são esses dois números que dizem se a prospecção paga a conta.
+
+## 12. Estado do piloto real (12/10/2026)
+
+**Ligado às 14:12.** `BROWSER_SEND_ENABLED=true` no `.env` e "Ligar envio real" no painel. Worker em `npm run worker`
+(sem recarregamento automático: toda mudança de código pede reiniciar à mão, senão um job morre no meio e deixa
+texto digitado na caixa de mensagem do Instagram).
+
+**O primeiro dia, em números:** 5 DMs reais (a cota), 2 respostas no mesmo dia (duas dentistas, as duas disseram
+que vão testar), 63 leads qualificados esperando — uns 12 dias de envio a 5 por dia.
+
+**A Meta.** A API de mensagens funciona com o app como está ("Publicado", acesso padrão): as respostas saem pela
+API sem análise da Meta. Pedir a análise exigiria virar "Tech Provider" (irreversível, verificação de empresa e
+de acesso, análise mais rígida) — recusado. No lugar, a **verificação da empresa** do portfólio foi feita com o
+CNPJ da DropDesk (o Scriptroom é produto dela) e aprovada no mesmo dia.
+
+**Como a conversa continua.** A pessoa responde quando quiser — hoje, amanhã, na semana que vem — e a IA continua
+o atendimento: toda mensagem dela reabre a janela de 24 h da Meta, e a resposta sai pela API dentro dessa janela.
+O que a IA **não** faz é tomar a iniciativa fora da janela: o follow-up (nosso "e aí, testou?") só sai pela API se
+a última mensagem dela tiver menos de 24 h; passado isso, o lead vai para "Janela de 24 h fechada" em Exceções, e
+você manda à mão pelo Instagram, se quiser. O sistema nunca manda follow-up pelo navegador.
+
+**Quatro lições do primeiro dia, já consertadas no código:**
+
+1. **Rajada de mensagens.** A pessoa responde em três mensagens curtas em dez segundos; cada uma virava uma
+   resposta (três para a mesma dentista). Agora a mensagem espera `INBOUND_SETTLE_SECONDS=45` de silêncio, a mais
+   nova responde por todas, e o worker olha a caixa de entrada a cada 30 s mesmo no meio de um job longo.
+2. **"Vou testar" não encerra.** O modelo respondeu "vou testar" com "encerrar" e tirou a lead do funil. Encerrar
+   é só para "não tenho interesse" e "pare de me mandar"; o resto vira follow-up em 48 h, **sempre com um
+   agradecimento de uma linha** (se o modelo devolver vazio, o código manda uma frase fixa).
+3. **Simulado vira real.** O perfil que tinha sido simulado segurava a chave de "mensagem única" e o primeiro
+   envio real pausaria o sistema inteiro. A simulação não segura mais a chave.
+4. **O freio silencioso do Instagram.** 135 perfis lidos e 21 buscas numa tarde, e a busca passou a voltar vazia,
+   sem erro. Entrou ritmo humano: `BROWSER_PACING_SECONDS=45` entre páginas (com variação; respostas pela API
+   nunca esperam), `DISCOVERY_QUERIES_PER_DAY=4` em rodízio, descoberta só com menos de `DISCOVERY_BACKLOG_TARGET=40`
+   qualificados esperando, e `ENRICH_PER_DAY=40`. Sinal de alerta no log: "no posts in the grid" repetido =
+   Instagram freando; pause o navegador pelo painel e volte no dia seguinte.
+
+**O que olhar todo dia no painel:** Exceções (janela fechada, revisão humana, falha de envio), a linha do tempo de
+quem respondeu, e o gasto de IA do mês (hoje: centavos).
