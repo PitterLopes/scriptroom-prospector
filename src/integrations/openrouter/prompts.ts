@@ -64,8 +64,11 @@ function companyBlock(config: BusinessConfig): string {
     `O QUE A EMPRESA RESOLVE: ${config.offer.oneLinePitch}`,
     `COMO FUNCIONA: ${config.offer.howItWorks.join(" → ")}`,
     `MODELO DE RECEITA: ${config.offer.revenueModel}`,
+    config.offer.positioning.length > 0 ? `POSICIONAMENTO:\n${config.offer.positioning.map((p) => `- ${p}`).join("\n")}` : "",
     `VOCABULÁRIO DO NICHO:\n${jargon}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function claimsBlock(config: BusinessConfig): string {
@@ -190,6 +193,7 @@ export function decidePrompt(
     `- Só use a ação send_store_link quando a pessoa quiser experimentar; aí a resposta inclui o link ${storeLink} e lembra que o primeiro roteiro é grátis.`,
     whatsapp ? `- Se a pessoa quiser falar com alguém, use send_whatsapp_link com ${whatsapp}.` : "- Não existe WhatsApp: se a pessoa pedir para falar com alguém, use escalate_to_human.",
     "- Objeção: reconheça, responda com uma afirmação permitida que toque no ponto, e devolva uma pergunta. Não insista mais de uma vez.",
+    "- Objeção 'já tenho agência / freelancer / alguém que faz': não dispute. Use o POSICIONAMENTO: o app é alavanca para quem produz, e a pessoa pode repassar a quem cuida dos vídeos dela; se ela mesma aparece no vídeo, o roteiro e o teleprompter continuam sendo para ela.",
     "- not_the_owner ou will_forward: agradeça e pergunte, de forma leve, qual é a melhor forma de chegar a quem decide; nunca pressione.",
     "- not_interested: agradeça em uma frase e encerre (close). opt_out: encerre sem resposta nenhuma (close, reply vazio).",
     "- needs_human ou qualquer pedido fora do que você pode responder: escalate_to_human, reply vazio.",

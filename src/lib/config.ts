@@ -20,6 +20,8 @@ const businessSchema = z.object({
     revenueModel: z.string().min(1),
     /** Honest first-person context for the first DM: who is writing, why, and what a reply (even a "no") does for them. */
     founderStory: z.string().min(20),
+    /** How the product sits next to agencies and freelancers; used when a lead says someone else makes their videos. */
+    positioning: z.array(z.string().min(1)).default([]),
     marketJargon: z.record(z.string(), z.string()),
   }),
   claims: z.object({

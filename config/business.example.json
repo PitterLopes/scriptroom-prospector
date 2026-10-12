@@ -24,7 +24,10 @@
     "marketJargon": {
       "{{termo do nicho}}": "{{o que significa}}"
     },
-    "founderStory": "{{quem você é, por que está construindo isso e o que uma resposta — até um \\\"não\\\" — faz por você}}"
+    "founderStory": "{{quem você é, por que está construindo isso e o que uma resposta — até um \\\"não\\\" — faz por você}}",
+    "positioning": [
+      "{{como o produto se posiciona diante de agências, freelancers ou outras soluções que o lead já usa}}"
+    ]
   },
   "claims": {
     "verified": [
