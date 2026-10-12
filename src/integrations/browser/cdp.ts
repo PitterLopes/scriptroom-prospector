@@ -118,11 +118,21 @@ export class RealInstagramBrowser implements InstagramBrowser {
     return this.withPage(jobId, async (page) => {
       const term = query.replace(/^#/, "");
       await this.goto(page, `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(term)}`);
-      await page.waitForTimeout(4000);
+      await page.waitForTimeout(1500);
       await this.assertNotRestricted(page);
       // The search page is a grid of posts about the term. The people who published them are the candidates:
-      // by construction they already make content on the subject.
-      const hrefs = await page.locator('a[href*="/p/"], a[href*="/reel/"]').evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).getAttribute("href") ?? ""));
+      // by construction they already make content on the subject. The grid renders after the page itself, and on a
+      // slow afternoon (2026-10-12) a fixed 4 s wait saw nothing: wait for the first post, then give the rest a moment.
+      const grid = page.locator('a[href*="/p/"], a[href*="/reel/"]');
+      await grid.first().waitFor({ state: "attached", timeout: 20_000 }).catch(() => undefined);
+      if ((await grid.count()) === 0) {
+        await page.mouse.wheel(0, 600);
+        await grid.first().waitFor({ state: "attached", timeout: 10_000 }).catch(() => undefined);
+      }
+      await page.waitForTimeout(2500);
+      await this.assertNotRestricted(page);
+      const hrefs = await grid.evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).getAttribute("href") ?? ""));
+      if (hrefs.length === 0) log.warn("search grid did not render", { query, url: page.url() });
       const codes: Array<{ url: string; kind: "post" | "reel" }> = [];
       const seenCodes = new Set<string>();
       for (const href of hrefs) {

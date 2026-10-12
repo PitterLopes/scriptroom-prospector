@@ -21,6 +21,13 @@ export const discoverProfiles: JobHandler = async (job, ctx) => {
       if (!(await browser.isLoggedIn())) throw new InstagramRestrictionError("operator session is not logged in");
       return browser.searchProfiles(payload.query, payload.limit, job.id);
     });
+    // An empty grid is almost always Instagram being slow, not a term without posts: try the query once more later.
+    if (candidates.length === 0) {
+      const alreadyRetried = job.idempotencyKey?.endsWith(":retry") ?? false;
+      const queued = alreadyRetried ? null : enqueue(ctx.db, "discover_profiles", payload, { idempotencyKey: `${job.idempotencyKey ?? `discover:${payload.query}`}:retry`, runAt: addSeconds(ctx.now(), 30 * 60), maxAttempts: 2 });
+      audit(ctx.db, "worker", "discovery_empty", payload.query, { retryQueued: Boolean(queued) });
+      return done(queued ? "no posts in the grid; one retry queued for 30 min from now" : "no posts in the grid");
+    }
     let created = 0;
     let duplicates = 0;
     let refused = 0;
