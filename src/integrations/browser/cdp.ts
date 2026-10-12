@@ -318,6 +318,14 @@ export class RealInstagramBrowser implements InstagramBrowser {
         // not change), with an unnamed textbox. Older builds navigated to /direct/t/…; both end in a textbox.
         await page.waitForTimeout(2500);
         await this.assertNotRestricted(page);
+        // Seen on 2026-10-12 with a business sender writing to a verified creator: a dialog offers a paid "priority"
+        // message or a plain contact request. Always the plain request; the priority one is a partnership product.
+        const contactRequest = page.locator('[role="dialog"]').getByRole("button", { name: /^(enviar solicitação de contato|send message request|send request)$/i }).first();
+        if ((await contactRequest.count()) > 0) {
+          log.info("choosing the plain message request over the priority message", { username: handle });
+          await contactRequest.click();
+          await page.waitForTimeout(2000);
+        }
         const notNow = page.getByRole("button", { name: /^(not now|agora não)$/i }).first();
         if ((await notNow.count()) > 0) await notNow.click().catch(() => undefined);
         const named = page.getByRole("textbox", { name: /message|mensagem/i });
