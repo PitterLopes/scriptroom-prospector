@@ -159,6 +159,13 @@ export function scoreProfile(profile: ProfileSignals, config: BusinessConfig): I
     reasons.push("Brazilian city in bio");
   }
 
+  // The ICP is Brazilian: a profile whose bio and captions read as English is not a lead (hashtag search ignores language).
+  const foreign = looksForeign(`${profile.bio ?? ""} ${postsText}`);
+  if (foreign) {
+    score -= 60;
+    reasons.push("bio and captions are not in Portuguese");
+  }
+
   const roleGuess = guessRole(profile.bio ?? "", profile.fullName ?? "");
   if (roleGuess === "owner" || roleGuess === "decision_maker") {
     score += 10;
@@ -180,8 +187,20 @@ export function scoreProfile(profile: ProfileSignals, config: BusinessConfig): I
     roleGuess,
     priority,
     // A person who publishes, who is not an employee or a student, and whose profile gave us a real post to talk about.
-    qualified: bounded >= 50 && roleGuess !== "employee" && posts.length > 0 && !tooBig,
+    qualified: bounded >= 50 && roleGuess !== "employee" && posts.length > 0 && !tooBig && !foreign,
   };
+}
+
+const PT_WORDS = /\b(você|voce|não|nao|para|com|que|uma|mais|seu|sua|isso|como|dente|dentes|treino|hoje|aqui|também|tambem|pela|pelo|são|sao|está|esta|quem|tudo|muito)\b/gi;
+const EN_WORDS = /\b(the|and|you|your|with|this|that|for|are|have|from|about|what|when|our|how|get|just|more|here)\b/gi;
+
+/** True when the text has clearly more English than Portuguese function words (and enough words to tell). */
+export function looksForeign(text: string): boolean {
+  const normalized = text.toLowerCase();
+  const pt = (normalized.match(PT_WORDS) ?? []).length;
+  const en = (normalized.match(EN_WORDS) ?? []).length;
+  if (pt + en < 6) return false;
+  return en >= pt * 2;
 }
 
 export function guessSegment(haystackNormalized: string, config: BusinessConfig): string | null {

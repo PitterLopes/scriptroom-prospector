@@ -21,6 +21,11 @@ describe("scoreProfile", () => {
     expect(score.reasons.some((r) => r.includes("reel"))).toBe(true);
     expect(score.score).toBeGreaterThanOrEqual(50);
   });
+  it("never qualifies a profile that writes in English", () => {
+    const en = scoreProfile({ ...SAMPLE_PROFILES![0]!, bio: "Personal trainer in Huntington. Book your free session with the link below", recentPosts: [{ caption: "Here is what you get when you train with us: the best coaches and a plan that works for your goals", postedAt: new Date().toISOString(), kind: "reel" }] }, TEST_CONFIG);
+    expect(en.qualified).toBe(false);
+    expect(en.reasons).toContain("bio and captions are not in Portuguese");
+  });
   it("never qualifies a profile without a readable post, however good the bio", () => {
     const score = scoreProfile({ ...SAMPLE_PROFILES![0]!, recentPosts: [] }, TEST_CONFIG);
     expect(score.qualified).toBe(false);
