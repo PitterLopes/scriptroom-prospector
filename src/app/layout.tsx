@@ -2,11 +2,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { StatusStrip } from "./_components/status-strip";
+import { business } from "@/lib/config";
 
-export const metadata: Metadata = {
-  title: "Scriptroom Prospector",
-  description: "Prospecção autônoma no Instagram, com CRM e painel de controle.",
-};
+/** The panel carries the name of whichever business this instance prospects for. */
+function companyName(): string {
+  try {
+    return business().company.name;
+  } catch {
+    return "Prospector";
+  }
+}
+
+export function generateMetadata(): Metadata {
+  return {
+    title: `${companyName()} Prospector`,
+    description: "Prospecção autônoma no Instagram, com CRM e painel de controle.",
+  };
+}
 
 const NAV: Array<{ href: string; label: string }> = [
   { href: "/", label: "Visão geral" },
@@ -26,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="border-b border-[var(--line)] bg-[var(--surface)]">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
             <Link href="/" className="text-base font-semibold tracking-tight">
-              Scriptroom <span className="text-[var(--muted)]">Prospector</span>
+              {companyName()} <span className="text-[var(--muted)]">Prospector</span>
             </Link>
             <nav aria-label="Principal" className="flex flex-wrap gap-1 text-sm">
               {NAV.map((item) => (
