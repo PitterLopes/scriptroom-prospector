@@ -66,6 +66,20 @@ describe("discovery → scoring → first DM", () => {
     expect(browser.sent).toHaveLength(1);
   });
 
+  it("a lead simulated in dry-run is contacted for real once sending is turned on, without tripping the duplicate breaker", async () => {
+    const { ctx, db, browser } = buildContext({ env: { BROWSER_SEND_ENABLED: true } });
+    const ana = await discoverAndQualify(ctx, db);
+    expect(await sendFirstDm(job("send_first_dm", { leadId: ana.id }, ana.id), ctx)).toMatchObject({ kind: "done", note: "dry-run" });
+    setSetting(db, "browser.sendEnabled", true);
+    const real = await sendFirstDm(job("send_first_dm", { leadId: ana.id }, ana.id), ctx);
+    expect(real).toMatchObject({ kind: "done", note: "sent" });
+    expect(browser.sent.map((s) => s.dryRun)).toEqual([true, false]);
+    expect(getPause(db).paused).toBe(false);
+    const statuses = listMessages(db, ana.id).map((m) => m.status).sort();
+    expect(statuses).toEqual(["dry_run", "sent"]);
+    expect(getLead(db, ana.id)!.channelState).toBe("waiting_inbound_reply");
+  });
+
   it("respects the daily allowance (warm-up) and postpones", async () => {
     const extra = { username: "outra.dentista", exists: true, isPrivate: false, fullName: "Dra. B", bio: "Dentista CRO-PE 1 em Recife. Reels toda semana", followers: 2000, posts: 50, isBusiness: true, keywords: ["dentista"], recentPosts: [{ url: "https://www.instagram.com/reel/x1/", caption: "Dica rápida: como escovar com aparelho", postedAt: new Date().toISOString(), kind: "reel" as const }] };
     const { ctx, db } = buildContext({ env: { BROWSER_SEND_ENABLED: true, WARMUP_START_PER_DAY: 1 }, browser: { profiles: [...SAMPLE_PROFILES!, extra] } });
