@@ -1,12 +1,14 @@
-# Scriptroom Prospector — manual do operador
+# Prospector — manual do operador
 
-Este sistema prospecta profissionais no Instagram para o Scriptroom: descobre perfis, pontua, manda uma primeira
+Este sistema prospecta pessoas no Instagram para o seu negócio: descobre perfis, pontua, manda uma primeira
 mensagem pessoal pelo **seu** Chrome, e continua a conversa pela **API oficial da Meta** quando a pessoa responde.
-Ele roda só na sua máquina. Nada sobe para servidor nenhum além da OpenRouter (a IA) e da Meta (a API).
+Ele roda só na sua máquina. Nada sobe para servidor nenhum além da OpenRouter (a IA), da Meta (a API) e da sua
+caixa de entrada na Cloudflare (os webhooks). O que é do seu negócio mora em `config/business.json`; o resto do
+código não sabe de produto nenhum.
 
 **Antes de começar, o aviso honesto:** mandar DM automatizada pela interface do Instagram vai contra os termos de
 uso da Meta. O sistema imita o ritmo de uma pessoa e para sozinho ao primeiro sinal de restrição, mas a conta usada
-(hoje, `@lopespitter`) pode ser limitada ou bloqueada. Por isso ele nasce em **modo simulação**: nada é enviado até
+pode ser limitada ou bloqueada. Por isso ele nasce em **modo simulação**: nada é enviado até
 você ligar o envio real em dois lugares, de propósito.
 
 ---
@@ -15,7 +17,7 @@ você ligar o envio real em dois lugares, de propósito.
 
 - macOS, Linux ou Windows com **Node.js 22 ou mais novo** (`node -v`).
 - **Google Chrome** instalado.
-- Uma conta **Business ou Creator** no Instagram, ligada a uma **Página do Facebook** (a `@lopespitter` já é).
+- Uma conta **Business ou Creator** no Instagram, do seu negócio. É ela que manda as mensagens.
 - Uma chave da **OpenRouter** só para este projeto (passo 3).
 - Para a continuação pela API: um app no **Meta for Developers** com o produto Instagram (passo 5).
 
@@ -70,32 +72,55 @@ roda; pode minimizar. O sistema abre a própria aba, digita e fecha a aba; nunca
 ## 5. A API oficial da Meta (continuação da conversa)
 
 Esta parte é opcional para testar o resto, mas sem ela toda resposta de lead vai para "Precisa de você" no painel,
-e você responde à mão. Com ela, a IA responde sozinha dentro das regras.
+e você responde à mão. Com ela, a IA responde sozinha dentro das regras. Leva uma hora, e a maior parte é clicar
+no Meta for Developers. Nada aqui pede a sua senha a ninguém: quem loga é você, no seu navegador.
 
-1. **Feito em 12/10/2026:** no app **Scriptroom** do Meta for Developers entrou o caso de uso "Gerenciar mensagens
-   e conteúdo no Instagram" (API com login do Instagram, app do Instagram `Scriptroom-IG`), com as permissões
-   `instagram_business_basic`, `instagram_business_manage_comments` e `instagram_business_manage_messages`.
-2. **Feito em 12/10/2026:** a `@lopespitter` foi adicionada como "Testadora do Instagram" do app, o convite foi
-   aceito no Instagram, o token de acesso foi gerado (a janela de gerar token é um pop-up: o Chrome precisa permitir
-   pop-ups de developers.facebook.com) e a conta foi inscrita no campo `messages` do webhook.
-3. **No `.env` já estão** `INSTAGRAM_PAGE_ACCESS_TOKEN` (token do Instagram, prefixo `IGAA`, de longa duração: a Meta
-   avisa quando ele vence; gere outro no mesmo lugar e troque no `.env`), `INSTAGRAM_BUSINESS_ACCOUNT_ID`
-   (17841401199182901), `INSTAGRAM_APP_SECRET` e `INSTAGRAM_WEBHOOK_VERIFY_TOKEN`. O id que `/me` devolve para
-   esse token é outro (28721963587423697): é o id do usuário na API com login do Instagram. Nenhum dos dois é segredo.
-4. Enquanto o app não passa pela **análise da Meta** (etapa 5 na página do caso de uso), só contas com função no app
-   (você) conseguem conversar pela API. Para o piloto com leads de verdade, peça a análise de
-   `instagram_business_manage_messages` quando o fluxo estiver provado.
-5. **O webhook já está configurado** (feito em 12/10/2026): a Meta entrega as mensagens numa caixa de entrada
-   na sua Cloudflare, o Worker `scriptroom-prospector-inbox` (pasta `relay/`), em
-   `https://scriptroom-prospector-inbox.pitterdebarros.workers.dev/webhook`, assinado com o segredo do app do
-   Instagram. O sistema no Mac busca os eventos de lá a cada poucos segundos (`RELAY_URL` e `RELAY_TOKEN` no
-   `.env`). Funciona mesmo com o Mac desligado: os eventos esperam até 14 dias. Para republicar o Worker depois
-   de uma mudança: `cd relay && npx wrangler deploy`. Os segredos dele (`APP_SECRET`, `VERIFY_TOKEN`,
-   `RELAY_TOKEN`) ficam na Cloudflare; para trocar, `npx wrangler secret put <NOME>` dentro de `relay/`.
-   Se um dia preferir um túnel direto para o Mac, a rota local `/api/webhooks/instagram` continua existindo.
-6. Em modo de desenvolvimento, o app só recebe mensagens de contas com papel no app (você). Para receber de qualquer
-   pessoa, o app precisa do **App Review** da Meta para `instagram_manage_messages`. Enquanto isso, teste com uma
-   segunda conta sua adicionada como testadora.
+1. **A caixa de entrada na Cloudflare** (pasta `relay/`): a Meta exige uma URL pública para entregar as mensagens,
+   e esta é um Worker pequeno que as guarda até o seu computador buscar (funciona com o computador desligado; os
+   eventos esperam até 14 dias). Com uma conta na Cloudflare: `cd relay && npm install && npx wrangler login &&
+   npx wrangler deploy --name <um-nome-seu>-inbox`. Gere dois segredos longos e grave-os no Worker e no `.env`:
+   `npx wrangler secret put VERIFY_TOKEN` (= `INSTAGRAM_WEBHOOK_VERIFY_TOKEN` no `.env`) e
+   `npx wrangler secret put RELAY_TOKEN` (= `RELAY_TOKEN`). `RELAY_URL` no `.env` é a URL que o deploy imprimiu.
+   O terceiro segredo, `APP_SECRET`, vem do passo 3.
+2. **O app no Meta for Developers:** "Criar app", caso de uso **"Gerenciar mensagens e conteúdo no Instagram"**,
+   conectado ao portfólio empresarial do seu negócio (se o portfólio já tiver a verificação da empresa, melhor:
+   é ela que libera o uso para valer). Na página do caso de uso, aba "Configuração da API com login do Instagram":
+   **"Add all required permissions"** (`instagram_business_basic`, `instagram_business_manage_comments`,
+   `instagram_business_manage_messages`).
+3. **A chave secreta** ("Chave secreta do app do Instagram" › Mostrar): copie para `INSTAGRAM_APP_SECRET` no `.env`
+   e para o Worker (`npx wrangler secret put APP_SECRET` dentro de `relay/`). É com ela que o Worker confere que
+   cada mensagem veio mesmo da Meta.
+4. **O webhook:** na seção "3. Configurar webhooks", URL de callback `<RELAY_URL>/webhook` e o verify token do
+   passo 1; "Verificar e salvar". A Meta assina vários campos; só `messages` importa, o resto é ignorado.
+5. **A conta como testadora:** em "Funções do app" › "Adicionar pessoas" › **Testador do Instagram**, o @ do seu
+   negócio. O convite é aceito **no Instagram**, logado na conta do negócio (o Chrome dedicado do passo 4 serve):
+   Configurações › Apps e sites › Convites de testador › Aceitar.
+6. **O login da empresa:** na seção "4. Configurar o login da empresa no Instagram" › Configurar, URL de
+   redirecionamento `<RELAY_URL>/oauth`. Salvar.
+7. **O token, sem pop-up e sem senha.** Abra, no Chrome dedicado (já logado na conta do negócio), esta URL, trocando
+   `<ID>` pelo "ID do app do Instagram" da página do caso de uso:
+   `https://www.instagram.com/oauth/authorize?client_id=<ID>&redirect_uri=<RELAY_URL>/oauth&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments`
+   Clique em "Permitir". A página de volta (um 404 do Worker, normal) tem `?code=...` no endereço: esse código vale
+   uma vez e troca-se por um token de curta duração em `POST https://api.instagram.com/oauth/access_token`
+   (`client_id`, `client_secret`, `grant_type=authorization_code`, `redirect_uri`, `code`) e esse por um de 60 dias em
+   `GET https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=...&access_token=...`.
+   Grave o de 60 dias em `INSTAGRAM_PAGE_ACCESS_TOKEN`. Pegue o id da conta em
+   `GET https://graph.instagram.com/v26.0/me?fields=id,user_id,username&access_token=...` e grave o **`user_id`** em
+   `INSTAGRAM_BUSINESS_ACCOUNT_ID`. Por fim, inscreva a conta nas mensagens:
+   `POST https://graph.instagram.com/v26.0/me/subscribed_apps?subscribed_fields=messages&access_token=...`.
+   (Alternativa: o botão "Adicionar conta" › "Gerar token" da própria página faz o mesmo por um pop-up, que o Chrome
+   precisa permitir, e pede o login da conta do negócio ali.) **O token vence em 60 dias:** antes disso, renove com
+   `GET https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=...` e troque no `.env`.
+8. **Publicar o app** (menu "Publicar"): a Meta só entrega webhooks a app publicado. Para publicar ela exige, em
+   Configurações › Básico, ícone 1024×1024, URL da política de privacidade, categoria e URL de exclusão de dados.
+   Se ela disser "URL da política inválido", confira no Depurador de Compartilhamento (Ferramentas): o rastreador
+   dela pode ter levado 429 do seu site; "Extrair novamente" costuma resolver.
+9. **Teste:** na seção do webhook, "Teste" no campo `messages` › "Enviar para servidor". `GET <RELAY_URL>/health`
+   mostra `total: 1`, e o worker local puxa o evento na próxima passada (ele descarta, porque não é lead: certo).
+
+**Não é preciso pedir a "análise do app" à Meta** para conversar com os seus leads: com a conta do negócio como
+testadora, o app publicado e o portfólio verificado, as respostas saem pela API. A análise só seria necessária para
+oferecer o serviço a outras empresas (modo "Tech Provider", irreversível).
 
 ## 6. Rodar
 
@@ -111,7 +136,7 @@ horário de operação, leitura e pontuação de cada perfil, e a primeira mensa
 
 Para rodar sem o painel: `npm run worker`. Para rodar uma passada só: `npm run worker:once`.
 
-## 6b. O que a primeira mensagem faz (decidido em 12/10/2026)
+## 6b. O que a primeira mensagem faz
 
 - **Alvo:** quem já grava vídeo falando do próprio trabalho, ou está tentando. A profissão é só uma pista; o que
   qualifica é ter post público recente, de preferência Reels. Perfil sem post legível não é abordado: não há o que
@@ -119,13 +144,13 @@ Para rodar sem o painel: `npm run worker`. Para rodar uma passada só: `npm run 
 - **Antes de mandar, o sistema lê até 3 posts da pessoa** (legenda e data) e **passa a seguir** o perfil (só no envio
   real; `FOLLOW_BEFORE_DM=true` no `.env`).
 - **A mensagem é honesta do começo ao fim:** começa elogiando um post real (a IA tem de apontar qual, e o código
-  confere), diz que você está desenvolvendo o app sozinho e sem investimento de fora, pede o teste e o feedback, e
-  deixa claro que um "não faz sentido para mim" também ajuda. Sem link, sem preço, sem promessa. O texto base está em
-  `config/business.json › offer.founderStory`.
+  confere), diz quem você é e por que está escrevendo (com as palavras de `config/business.json › offer.founderStory`),
+  pede o teste e o feedback, e deixa claro que um "não faz sentido para mim" também ajuda. Sem link, sem preço, sem
+  promessa. Escrita como quem digita no celular, nunca como uma empresa.
 - **Três variantes no experimento** (pedido completo, curta, de colega), medidas pela taxa de resposta.
-- **Ritmo:** 5 mensagens por dia, fixas (decisão de 12/10/2026 à noite: "mantemos as 5; depois subimos"). O teto
-  mora em dois lugares: no painel (`limits.override`, lido a cada envio) e no `.env` (`MAX_DMS_PER_DAY=5`,
-  `WARMUP_STEP_PER_WEEK=0`). Para subir, mude os dois.
+- **Ritmo:** comece com 5 mensagens por dia e suba devagar. O teto mora em dois lugares: no painel
+  (`limits.override`, lido a cada envio) e no `.env` (`MAX_DMS_PER_DAY`, `WARMUP_START_PER_DAY`,
+  `WARMUP_STEP_PER_WEEK`). Para mudar, mude os dois.
 
 ## 7. Testar, na ordem certa
 
@@ -136,7 +161,7 @@ Para rodar sem o painel: `npm run worker`. Para rodar uma passada só: `npm run 
    perfil, pontua, escreve a mensagem com a IA, **digita no campo e apaga sem enviar**. Você vê a mensagem na
    linha do tempo do lead, marcada "Simulada (não enviada)".
 3. **Piloto real, só quando você autorizar:** no `.env`, `BROWSER_SEND_ENABLED=true`, reinicie, e na faixa do topo
-   clique **"Ligar envio real"**. Ligado em 12/10/2026 às 14:12 (ver a seção 12).
+   clique **"Ligar envio real"**. Comece com 5 por dia.
 
 Nada é enviado de verdade sem os dois passos do item 3.
 
@@ -175,48 +200,7 @@ contatar) · Configurações.
 Marque "Cadastrado" e "Cliente ativo" à mão no lead quando souber: a App Store não diz quem instalou a partir de
 uma DM, e são esses dois números que dizem se a prospecção paga a conta.
 
-## 12. Estado do piloto real (12/10/2026)
-
-**Ligado às 14:12.** `BROWSER_SEND_ENABLED=true` no `.env` e "Ligar envio real" no painel. Worker em `npm run worker`
-(sem recarregamento automático: toda mudança de código pede reiniciar à mão, senão um job morre no meio e deixa
-texto digitado na caixa de mensagem do Instagram).
-
-**O primeiro dia, em números:** 5 DMs reais (a cota), 2 respostas no mesmo dia (duas dentistas, as duas disseram
-que vão testar), 63 leads qualificados esperando — uns 12 dias de envio a 5 por dia.
-
-**A Meta.** A API de mensagens funciona com o app como está ("Publicado", acesso padrão): as respostas saem pela
-API sem análise da Meta. Pedir a análise exigiria virar "Tech Provider" (irreversível, verificação de empresa e
-de acesso, análise mais rígida) — recusado. No lugar, a **verificação da empresa** do portfólio foi feita com o
-CNPJ da DropDesk (o Scriptroom é produto dela) e aprovada no mesmo dia.
-
-**Como a conversa continua.** A pessoa responde quando quiser — hoje, amanhã, na semana que vem — e a IA continua
-o atendimento: toda mensagem dela reabre a janela de 24 h da Meta, e a resposta sai pela API dentro dessa janela.
-**O follow-up é um só, e sai dentro da janela** (decisão de 12/10/2026 à noite): 22 h depois da última mensagem
-dela, uma frase leve perguntando se chegou a testar e lembrando que "não fez sentido" também é resposta. Se ela
-não responder nas 24 h seguintes, o lead é encerrado pelo próprio sistema ("o app não fez sentido para ela"): o
-teste é rápido, e silêncio depois do follow-up é a resposta. O sistema nunca manda follow-up pelo navegador; fora
-da janela ele avisa em Exceções e você manda à mão, se quiser.
-
-**Quatro lições do primeiro dia, já consertadas no código:**
-
-1. **Rajada de mensagens.** A pessoa responde em três mensagens curtas em dez segundos; cada uma virava uma
-   resposta (três para a mesma dentista). Agora a mensagem espera `INBOUND_SETTLE_SECONDS=45` de silêncio, a mais
-   nova responde por todas, e o worker olha a caixa de entrada a cada 30 s mesmo no meio de um job longo.
-2. **"Vou testar" não encerra.** O modelo respondeu "vou testar" com "encerrar" e tirou a lead do funil. Encerrar
-   é só para "não tenho interesse" e "pare de me mandar"; o resto vira follow-up em 48 h, **sempre com um
-   agradecimento de uma linha** (se o modelo devolver vazio, o código manda uma frase fixa).
-3. **Simulado vira real.** O perfil que tinha sido simulado segurava a chave de "mensagem única" e o primeiro
-   envio real pausaria o sistema inteiro. A simulação não segura mais a chave.
-4. **O freio silencioso do Instagram.** 135 perfis lidos e 21 buscas numa tarde, e a busca passou a voltar vazia,
-   sem erro. Entrou ritmo humano: `BROWSER_PACING_SECONDS=45` entre páginas (com variação; respostas pela API
-   nunca esperam), `DISCOVERY_QUERIES_PER_DAY=4` em rodízio, descoberta só com menos de `DISCOVERY_BACKLOG_TARGET=40`
-   qualificados esperando, e `ENRICH_PER_DAY=40`. Sinal de alerta no log: "no posts in the grid" repetido =
-   Instagram freando; pause o navegador pelo painel e volte no dia seguinte.
-
-**O que olhar todo dia no painel:** Exceções (janela fechada, revisão humana, falha de envio), a linha do tempo de
-quem respondeu, e o gasto de IA do mês (hoje: centavos).
-
-## 13. Segunda instância: outro produto, mesmo código (DropDesk, 12/10/2026)
+## 12. Segunda instância: outro produto, mesmo código
 
 O sistema não sabe de produto nenhum: tudo o que é de um negócio mora em `config/business.json` (empresa, oferta,
 história de quem escreve, posicionamento, fatos verificados, público, hashtags, links por nicho e WhatsApp), no
@@ -228,14 +212,14 @@ Correção de código vai para o repositório e chega às duas cópias com `git 
 
 | | 1ª instância | 2ª instância |
 |---|---|---|
-| Pasta | `~/scriptroom-prospector` | `~/dropdesk/prospector` |
+| Pasta | `~/prospector` | `~/outro-produto/prospector` |
 | Chrome dedicado | porta 9222 | `CHROME_DEBUG_PORT=9223 scripts/chrome-debug.sh` (perfil próprio) |
 | Painel | 3100 | `PANEL_PORT=3101` no `.env` |
-| Caixa de entrada | Worker `scriptroom-prospector-inbox` | `npx wrangler deploy --name dropdesk-prospector-inbox` + segredos próprios |
-| App da Meta | Scriptroom | app próprio, no portfólio da empresa |
+| Caixa de entrada | Worker `<produto-1>-inbox` | `npx wrangler deploy --name <produto-2>-inbox` + segredos próprios |
+| App da Meta | app do produto 1 | app próprio, no portfólio da empresa 2 |
 | Chave OpenRouter | uma por produto, com limite próprio | idem |
 
-**Como a DropDesk foi montada (12/10/2026), para repetir com o próximo produto:**
+**Como a segunda instância foi montada (receita para o próximo produto):**
 
 1. Clone, `npm install`, `.env` a partir do `.env.example` com as portas e a URL do Worker novo.
 2. Chrome dedicado na porta nova; a pessoa loga o Instagram do produto nele. **A janela tem de ter largura de
@@ -248,21 +232,13 @@ Correção de código vai para o repositório e chega às duas cópias com `git 
    assina todos os campos; só `messages` importa); a conta do Instagram como **Testadora do Instagram** (o convite
    se aceita no Instagram, em Configurações › Apps e sites, pelo Chrome dedicado); login da empresa com a URL de
    redirecionamento `…workers.dev/oauth`; ficha do app (ícone 1024, política, termos, exclusão de dados, categoria)
-   e **Publicar**. Se a Meta disser "URL da política inválido", confira no Depurador de Compartilhamento: o site da
-   DropDesk (Wix) devolveu 429 ao rastreador; "Extrair novamente" resolveu.
+   e **Publicar**. Se a Meta disser "URL da política inválido", confira no Depurador de Compartilhamento: um site
+   pode devolver 429 ao rastreador dela; "Extrair novamente" resolve.
 5. **O token sem senha nenhuma:** a URL de autorização (`instagram.com/oauth/authorize?client_id=<id do app
    Instagram>&redirect_uri=…/oauth&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments`)
    aberta no Chrome dedicado (já logado), "Permitir", o `code` lido da URL de volta, trocado em
    `api.instagram.com/oauth/access_token` e depois em `graph.instagram.com/access_token?grant_type=ig_exchange_token`
    (60 dias; renovar com `refresh_access_token` antes). `POST /me/subscribed_apps?subscribed_fields=messages`.
    O id da conta para o `.env` é o `user_id` de `/me?fields=id,user_id,username`.
-6. Chave OpenRouter nova, `business.json` preenchido (a partir da landing page e do contrato), `npm run dev`,
+6. Chave OpenRouter nova, `business.json` preenchido (a partir da landing page e do que você pode provar), `npm run dev`,
    simulação, e só então o envio real.
-
-**Estado da DropDesk em 12/10/2026, 16:35:** envio real ligado com **10 por dia** (`limits.override` e `.env`),
-follow antes da DM, abertura na voz de cofundador pedindo opinião, WhatsApp só para quem pede, landing page por
-nicho como caminho padrão. Primeira DM real para um escritório de contabilidade às 16:35, com resposta pela API
-da conta @dropdeskoficial. **Lições do primeiro dia:** o Instagram, para uma conta comercial escrevendo a um perfil
-verificado, abre "Enviar mensagem prioritária / Enviar solicitação de contato" — o worker escolhe a solicitação de
-contato, nunca a prioritária (produto pago de parceria); o texto base longo demais fazia a abertura passar de 480
-caracteres (encurtado); o painel passou a mostrar o nome da empresa da configuração.
