@@ -242,3 +242,8 @@ Correção de código vai para o repositório e chega às duas cópias com `git 
    O id da conta para o `.env` é o `user_id` de `/me?fields=id,user_id,username`.
 6. Chave OpenRouter nova, `business.json` preenchido (a partir da landing page e do que você pode provar), `npm run dev`,
    simulação, e só então o envio real.
+
+## 13. Histórico e estado
+
+O que aconteceu em cada piloto (datas, decisões de cota, lições do Instagram) fica em `docs/piloto-2026-10.md`,
+e não aqui: este manual descreve o sistema, não um operador. O repositório é público desde 13/10/2026.
