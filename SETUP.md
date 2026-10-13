@@ -40,8 +40,26 @@ uma afirmação ou um segmento, edite esse arquivo e reinicie o worker.
 2. Cole no `.env`, na linha `OPENROUTER_API_KEY=`. Nunca cole a chave no chat, em print ou em commit.
 3. `OPENROUTER_MONTHLY_BUDGET_USD=20` é o teto do mês: ao chegar lá o sistema **pausa sozinho**.
 
-Por que uma chave separada: o custo deste projeto aparece separado do app no painel da OpenRouter, e se ela vazar
-você revoga só ela, sem mexer no servidor do Scriptroom.
+Por que uma chave separada: o custo deste projeto aparece separado no painel da OpenRouter, e se ela vazar você
+revoga só ela, sem mexer em mais nada.
+
+**Quais modelos de IA ele usa, e por quê.** São dois, definidos no `.env` e já preenchidos no `.env.example`:
+
+- `OPENROUTER_MODEL=deepseek/deepseek-v4-pro-0813` — escreve a primeira mensagem e decide cada resposta da
+  conversa. Foi escolhido porque escreve bem em português, obedece a estrutura pedida (elogio real, quem escreve,
+  pedido, o "não" também ajuda) e custa centavos: uma abertura sai por menos de US$ 0,01.
+- `OPENROUTER_MODEL_FAST=deepseek/deepseek-v4.1-flash` — classifica a intenção de cada resposta recebida
+  (interessado, pediu preço, não é quem decide, pediu para parar…). Tarefa simples, modelo barato e rápido.
+
+Com 10 mensagens por dia e as conversas que elas geram, o gasto fica na casa de **US$ 1 a 3 por mês**. O teto
+`OPENROUTER_MONTHLY_BUDGET_USD` pausa o sistema se passar. O raciocínio ("thinking") dos modelos fica desligado de
+propósito: ligado, o DeepSeek estoura o tamanho da resposta e fica lento.
+
+Dá para trocar qualquer um dos dois por outro modelo da OpenRouter só mudando a linha no `.env` (por exemplo
+`anthropic/claude-sonnet-5-5` para a escrita, mais caro e um pouco melhor em nuance). O que não muda: o
+verificador de afirmações roda sobre o texto de qualquer modelo, então um modelo "criativo demais" só gera mais
+recusas e revisões humanas, não mensagens erradas. Se trocar, rode uma semana em simulação e leia as mensagens
+no painel antes de ligar o envio real.
 
 ## 4. O Chrome com perfil dedicado (primeiro contato)
 
@@ -247,3 +265,33 @@ Correção de código vai para o repositório e chega às duas cópias com `git 
 
 O que aconteceu em cada piloto (datas, decisões de cota, lições do Instagram) fica em `docs/piloto-2026-10.md`,
 e não aqui: este manual descreve o sistema, não um operador. O repositório é público desde 13/10/2026.
+
+## 14. Outras redes (planejado, não construído)
+
+O sistema foi desenhado com a rede isolada numa camada. É genérico (e serve a qualquer rede): o banco e os
+estados do lead, a fila de jobs, a IA que escreve e conduz, o verificador de afirmações, os experimentos de
+abordagem, o follow-up único, os disjuntores, a cota e o ritmo, o painel. É do Instagram: a implementação do
+navegador (buscar perfis, ler perfil, mandar a primeira mensagem, detectar restrição), a continuação pela API da
+Meta e a pontuação por Reels e seguidores.
+
+**Para o LinkedIn** seria preciso: (1) um adaptador de navegador novo (busca por cargo, setor e palavra-chave;
+leitura de cabeçalho, "sobre" e atividade; detecção de restrição); (2) o primeiro contato em dois passos —
+**pedido de conexão → aceite → mensagem** — com dois estados a mais no funil, lembrando que a nota do convite tem
+300 caracteres e, em contas gratuitas, só algumas por mês levam nota; (3) a leitura das respostas também pelo
+navegador, varrendo a caixa de mensagens a cada poucos minutos, porque o LinkedIn não tem API de mensagens
+aberta; (4) pontuação por cargo, setor, tamanho de empresa e atividade recente, num bloco de público por rede no
+`business.json`; (5) limites conservadores: 15 a 20 convites por dia, 100 por semana — a conta é o seu perfil
+pessoal, e o LinkedIn restringe mais rápido que o Instagram. Esforço: dois ou três dias de código depois de o fluxo
+do Instagram estar aprovado, mais uma semana em simulação para calibrar os seletores da interface.
+
+**As outras:**
+
+| Rede | Primeiro contato | Resposta | Observação |
+|---|---|---|---|
+| Facebook (Páginas) | mensagem pela Página, API oficial do Messenger | API oficial | o mais parecido com o que existe; mesmo app da Meta |
+| LinkedIn | navegador (convite + mensagem) | navegador | o mais arriscado para a conta |
+| TikTok | navegador | navegador | sem API de DM |
+| X | API paga de DM | API | abordagem fria por DM rende pouco |
+| WhatsApp | não serve para frio: a API exige opt-in e modelos aprovados | | bom como destino, não como origem |
+
+Ordem recomendada quando chegar a hora: Facebook primeiro (barato, mesma API), LinkedIn depois.

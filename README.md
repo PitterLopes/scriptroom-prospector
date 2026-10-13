@@ -22,6 +22,15 @@ em um arquivo de configuração. Para prospectar para a sua empresa, você preen
 - Uma conta de desenvolvedor na [Meta for Developers](https://developers.facebook.com) (grátis), para a API de
   mensagens, e uma conta na [Cloudflare](https://cloudflare.com) (grátis), para a caixa de entrada dos webhooks.
 
+## O jeito mais fácil: conversar com a IA
+
+Se você usa o [Claude Code](https://claude.com/claude-code), não precisa seguir o passo a passo à mão. Abra esta
+pasta nele e diga: **"Quero montar o prospector para a minha empresa."** O arquivo `CLAUDE.md` deste repositório
+ensina a IA a conduzir a instalação como uma conversa: ela pergunta sobre o seu negócio, lê o seu site, escreve o
+`config/business.json` para você aprovar, cria as chaves pelo seu navegador (sem nunca ver a sua senha), configura
+a Meta, roda a simulação, mostra as mensagens e só liga o envio real quando você disser. O passo a passo abaixo é
+o mesmo caminho, para quem prefere fazer sozinho.
+
 ## Passo a passo
 
 1. **Baixe e instale.**
